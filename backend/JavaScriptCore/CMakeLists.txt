@@ -37,7 +37,7 @@ if ("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin|iOS|tvOS|watchOS"
     set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/JscWeakRef.mm PROPERTIES COMPILE_FLAGS "-fno-objc-arc")
 
     # objc-lib
-    target_link_libraries(ScriptX "-framework Foundation")
+    target_link_libraries(ScriptX INTERFACE "-framework Foundation")
 
 else ()
 
