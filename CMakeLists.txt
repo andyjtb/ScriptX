@@ -2,12 +2,14 @@ cmake_minimum_required(VERSION 3.0)
 
 file(STRINGS ${CMAKE_CURRENT_LIST_DIR}/VERSION SCRIPTX_VERSION)
 
+set(CMAKE_CXX_STANDARD 17)
+
 if ("${PROJECT_NAME}" STREQUAL "")
     project(ScriptX VERSION ${SCRIPTX_VERSION} LANGUAGES CXX C)
 endif ()
 
 if ("${CMAKE_CXX_STANDARD}" STREQUAL "")
-    message(WARNING "CMAKE_CXX_STANDARD not set, please set to 17 or latter")
+    message(WARNING "CMAKE_CXX_STANDARD not set, please set to 17 or later")
 endif ()
 
 set(SCRIPTX_DIR ${CMAKE_CURRENT_LIST_DIR})
@@ -72,7 +74,7 @@ add_library(ScriptX STATIC
         ${SCRIPTX_DIR}/src/utils/TypeInformation.h
         )
 
-target_include_directories(ScriptX PUBLIC ${SCRIPTX_DIR}/src/include)
+target_include_directories(ScriptX SYSTEM PUBLIC ${SCRIPTX_DIR}/src/include)
 
 ###### config implementation ######
 
