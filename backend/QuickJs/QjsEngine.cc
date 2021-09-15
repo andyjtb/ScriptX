@@ -107,6 +107,8 @@ void QjsEngine::initEngineResource() {
   pointer.class_name = "RawPointer";
   JS_NewClass(runtime_, kPointerClassId, &pointer);
 
+  JS_SetMaxStackSize(runtime_, 0);
+
   JSClassDef function{};
   function.class_name = "RawFunction";
   function.finalizer = [](JSRuntime* /*rt*/, JSValue val) {
