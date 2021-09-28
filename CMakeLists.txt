@@ -2,14 +2,14 @@ cmake_minimum_required(VERSION 3.0)
 
 file(STRINGS ${CMAKE_CURRENT_LIST_DIR}/VERSION SCRIPTX_VERSION)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 if ("${PROJECT_NAME}" STREQUAL "")
     project(ScriptX VERSION ${SCRIPTX_VERSION} LANGUAGES CXX C)
 endif ()
 
 if ("${CMAKE_CXX_STANDARD}" STREQUAL "")
-    message(WARNING "CMAKE_CXX_STANDARD not set, please set to 17 or later")
+    message(WARNING "CMAKE_CXX_STANDARD not set, please set to 20 or later")
 endif ()
 
 set(SCRIPTX_DIR ${CMAKE_CURRENT_LIST_DIR})
@@ -183,3 +183,7 @@ message(STATUS "Configuring ScriptX option SCRIPTX_NO_EXCEPTION_ON_BIND_FUNCTION
 message(STATUS "Configuring ScriptX feature SCRIPTX_FEATURE_INSPECTOR ${SCRIPTX_FEATURE_INSPECTOR}.")
 
 include(${SCRIPTX_DIR}/docs/doxygen/CMakeLists.txt)
+
+if (WIN32)
+    set_property(TARGET ScriptX PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()

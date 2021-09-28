@@ -228,7 +228,7 @@ void QjsEngine::extendLifeTimeToNextLoop(JSValue value) {
 
   auto mq = messageQueue();
   auto msg = mq->obtainInplaceMessage([](utils::InplaceMessage& msg) {});
-  msg->template inplaceObject<ExtendLifeTime>(value, this);
+  msg->inplaceObject<ExtendLifeTime>(value, this);
   msg->tag = this;
 
   mq->postMessage(msg);
