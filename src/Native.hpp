@@ -946,6 +946,9 @@ class ClassDefineBuilder : public internal::InstanceDefineBuilder<T> {
                               std::move(Instance::insProperties_), internal::sizeof_helper_v<T>});
     return define;
   }
+
+  template <typename A>
+  friend class ::script::WrappedClassDefineBuilder;
 };
 
 template <typename T>
@@ -1026,5 +1029,265 @@ template <typename C, typename... T>
 inline InstanceFunctionCallback adaptOverloadedInstanceFunction(T&&... functions) {
   return internal::adaptOverloadedInstanceFunction<C>(std::forward<T>(functions)...);
 }
+
+template<typename BC>
+class ScriptableWrapper : public script::ScriptClass
+{
+public:
+    using Type = BC;
+
+    ScriptableWrapper (BC& object)
+    : script::ScriptClass (script::ScriptClass::ConstructFromCpp<ScriptableWrapper>{})
+    , obj (object)
+    {}
+
+    inline BC& getWrappedObject() { return obj; }
+    BC& obj;
+};
+
+template <typename BaseClass>
+class WrappedClassDefineBuilder : public script::ClassDefineBuilder<ScriptableWrapper<BaseClass>>
+{
+private:
+    using WrapperClass = ScriptableWrapper<BaseClass>;
+
+    /**
+     This class is used to wrap up converting arguments and calling a cpp function
+     It stores the arguments in a tuple and applies those on the Ins
+     */
+    template <typename>
+    struct CustomConvertingFuncCallHelper {};
+
+    template <typename Ret, typename... Args>
+    struct CustomConvertingFuncCallHelper<std::pair<Ret, std::tuple<Args...>>>
+    {
+    private:
+        static constexpr auto ArgsLength = sizeof...(Args);
+
+        using TypeHolderTupleType = std::tuple<script::internal::TypeHolder<Args>...>;
+
+        template <typename Func, typename Base, size_t... index>
+        static script::Local<script::Value> callInstanceFunc (Func& func, Base* ins, const script::Arguments& args,
+                                                              std::index_sequence<index...>, bool nothrow,
+                                                              bool /*throwForOverload*/)
+        {
+            std::optional<TypeHolderTupleType> typeHolders;
+            std::optional<typename std::tuple<Args...>> cppArgs;
+
+            if (args.size() != ArgsLength)
+            {
+                if constexpr (ArgsLength > 0)
+                {
+                    if constexpr (! std::is_same_v<decltype (std::get<0>(*cppArgs)), const script::Arguments&>)
+                    {
+                        // fail fast
+                        if (nothrow) return {};
+                        std::ostringstream msg;
+                        msg << "Argument count mismatch, expect:" << (ArgsLength) << " got:" << args.size();
+                        throw script::Exception( msg.str());
+                    }
+                }
+            }
+            typeHolders.emplace (args[index]...);
+            if constexpr (ArgsLength > 0)
+            {
+                if constexpr (std::is_same_v<decltype (std::get<0>(*cppArgs)), const script::Arguments&>)
+                    cppArgs.emplace (args);
+                else
+                    cppArgs.emplace (std::get<index>(*typeHolders).template toCpp<Args>()...);
+            }
+
+            if constexpr (std::is_same_v<Ret, void>)
+            {
+                std::apply ([&](Args const&... tupleArgs)
+                {
+                    if constexpr (std::is_member_function_pointer_v<Func>)
+                        (ins->*func) (tupleArgs ...);
+                    else
+                        func (*ins, tupleArgs ...);
+                }, *std::move (cppArgs));
+                return {};
+            }
+            else
+            {
+                auto ret = std::apply ([&](Args const&... tupleArgs)
+                {
+                    if constexpr (std::is_member_function_pointer_v<Func>)
+                        return (ins->*func) (tupleArgs ...);
+                    else
+                        return func (*ins, tupleArgs ...);
+                }, *std::move (cppArgs));
+
+                try
+                {
+                    return script::converter::Converter<Ret>::toScript (ret);
+                }
+                catch (const script::Exception& e)
+                {
+                    return script::internal::handleException (e, nothrow);
+                }
+            }
+        }
+
+     public:
+
+        template <typename Func, typename Base>
+        static script::Local<script::Value> callInstanceFunc(Func& func, Base* ins, const script::Arguments& args, bool nothrow,
+                                           bool throwForOverload)
+        {
+            return callInstanceFunc(func, ins, args, std::make_index_sequence<ArgsLength>(), nothrow,
+                                    throwForOverload);
+        }
+    };
+
+    template<typename IdentifierType, typename CLASS,typename VarType>
+    script::InstanceGetterCallback getFunction (const IdentifierType& name, VarType CLASS::* getFunc)
+    {
+        return [name, getFunc] (WrapperClass* w)
+        {
+            using FunctionTraits = script::internal::FuncTrait<VarType CLASS::*>;
+            using RT = typename FunctionTraits::ReturnType;
+
+            auto result = (w->getWrappedObject().*getFunc) (name);
+            return script::converter::Converter<RT>::toScript (result);
+        };
+    }
+
+    template<typename IdentifierType, typename CLASS,typename VarType>
+    script::InstanceSetterCallback setFunction (const IdentifierType& name, VarType CLASS::* setFunc)
+    {
+        return [name, setFunc] (WrapperClass* w, const script::Local<script::Value>& value)
+        {
+            using FunctionTraits = script::internal::FuncTrait<VarType CLASS::*>;
+            using ArgTraits = script::internal::traits::TupleTrait<typename FunctionTraits::Arguments>;
+            using ValueArg = std::decay_t<typename ArgTraits::template Arg<2>>; // Get base type for setFuncs 3rd argument - eg. const int& -> int
+
+            return (w->getWrappedObject().*setFunc) (name, script::converter::Converter<ValueArg>::toCpp (value), true);
+        };
+    }
+
+    template<typename OtherClass>
+    void copyFunctions (const WrappedClassDefineBuilder<OtherClass>& define)
+    {
+        for (auto& funcDef : define.functions_)
+        {
+            this->function (funcDef.name, funcDef.callback);
+        }
+
+        for (auto& insFuncDef : define.insFunctions_)
+        {
+            this->instanceFunction (insFuncDef.name, [insFuncDef](WrapperClass* w, const Arguments& args)
+            {
+                auto converted = new ScriptableWrapper<OtherClass> (w->getWrappedObject());
+                return insFuncDef.callback (converted, args);
+            });
+        }
+    }
+
+    template<typename OtherClass>
+    void copyProperties (const WrappedClassDefineBuilder<OtherClass>& define)
+    {
+        for (auto& propDef : define.properties)
+        {
+            this->property (propDef.name, propDef.getter, propDef.setter);
+        }
+
+        for (auto& insPropDef : define.insProperties_)
+        {
+            std::function<Local<Value>(WrapperClass*)> getter = [insPropDef](WrapperClass* w)
+            {
+                auto converted = new ScriptableWrapper<OtherClass> (w->getWrappedObject());
+                return insPropDef.getter (converted);
+            };
+
+            std::function<void(WrapperClass*, const Local<Value>& value)> setter = nullptr;
+
+            if (insPropDef.setter != nullptr)
+            {
+                setter = [insPropDef](WrapperClass* w, const Local<Value>& value)
+                {
+                    auto converted = new ScriptableWrapper<OtherClass> (w->getWrappedObject());
+                    return insPropDef.setter (converted, value);
+                };
+            }
+
+            this->instanceProperty (insPropDef.name, getter, setter);
+        }
+    }
+
+public:
+    WrappedClassDefineBuilder (const std::string name) : script::ClassDefineBuilder<WrapperClass> (name)
+    {
+        this->constructor_ = [](const script::Arguments&) { return nullptr; };
+    }
+
+    template<typename CLASS,typename VarType>
+    WrappedClassDefineBuilder& insProp (const std::string& name, VarType CLASS::* getFunc)
+    {
+        const auto getter = [getFunc] (WrapperClass* w)
+        {
+            return script::converter::Converter<VarType>::toScript (std::reference_wrapper<VarType> (w->getWrappedObject().*getFunc));
+        };
+
+        this->instanceProperty (name, getter, nullptr);
+
+        return *this;
+    }
+
+    template<typename Lambda>
+    WrappedClassDefineBuilder& insPropLambda (const std::string& name, Lambda getFunc)
+    {
+        const auto getter = [getFunc] (WrapperClass* w)
+        {
+            using FunctionTraits = script::internal::FuncTrait<Lambda>;
+            using Return = typename FunctionTraits::ReturnType;
+
+            return script::converter::Converter<Return>::toScript (getFunc (w->getWrappedObject()));
+        };
+
+        this->instanceProperty (name, getter, nullptr);
+
+        return *this;
+    }
+
+    template<typename FunctionPointer>
+    WrappedClassDefineBuilder& insFunc (const std::string& name, FunctionPointer member)
+    {
+        using FunctionTraits = script::internal::FuncTrait<FunctionPointer>;
+        using ArgTraits = script::internal::traits::TupleTrait<typename FunctionTraits::Arguments>;
+
+        using Helper = CustomConvertingFuncCallHelper<
+            std::pair<typename FunctionTraits::ReturnType, typename ArgTraits::Tail>
+        >;
+
+        this->instanceFunction (name, [member](WrapperClass* w, const script::Arguments& args)
+        {
+            return Helper::callInstanceFunc (member, &w->getWrappedObject(), args, false, false);
+        });
+
+        return *this;
+    }
+
+    template<typename IdentifierType, typename CLASS,typename VarType>
+    WrappedClassDefineBuilder& insAttr (const IdentifierType& name, VarType CLASS::* getFunc)
+    {
+        this->instanceProperty (name, getFunction (name, getFunc), nullptr);
+        return *this;
+    }
+
+    template<typename IdentifierType, typename CLASS, typename VarType, typename BarType>
+    WrappedClassDefineBuilder& insWriteAttr (const IdentifierType& name, VarType CLASS::* getFunc, BarType CLASS::* setFunc)
+    {
+        this->instanceProperty (name, getFunction (name, getFunc), setFunction (name, setFunc));
+        return *this;
+    }
+
+    template<typename OtherClass>
+    void inheritFrom (const WrappedClassDefineBuilder<OtherClass>& define)
+    {
+        copyProperties (define);
+        copyFunctions (define);
+    }
+};
 
 }  // namespace script

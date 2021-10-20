@@ -371,6 +371,11 @@ auto selectOverloadedFunc(std::decay_t<Signature> func) {
 }
 
 // ==== ClassDefine ====
+template<typename A>
+class ScriptableWrapper;
+
+template <typename A>
+class WrappedClassDefineBuilder;
 
 namespace internal {
 
@@ -392,7 +397,9 @@ class InstanceDefineBuilderState;
   friend typename ::script::internal::ImplType<::script::ScriptEngine>::type; \
   template <typename TT>                                                      \
   friend class ::script::internal::InstanceDefineBuilder;                     \
-  friend class ::script::internal::InstanceDefineBuilderState;
+  friend class ::script::internal::InstanceDefineBuilderState;                \
+  template <typename A>                                                       \
+  friend class ::script::WrappedClassDefineBuilder;
 
 class StaticDefine {
   class PropertyDefine {
@@ -466,7 +473,7 @@ class InstanceDefine {
 
     std::string name;
     FunctionCallback callback;
-    std::string traceName;
+    std::string traceName = name;
 
     FunctionDefine(std::string name, FunctionCallback callback, std::string traceName)
         : name(std::move(name)), callback(std::move(callback)), traceName(std::move(traceName)) {}
