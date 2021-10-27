@@ -1039,10 +1039,19 @@ public:
     ScriptableWrapper (BC& object)
     : script::ScriptClass (script::ScriptClass::ConstructFromCpp<ScriptableWrapper>{})
     , obj (object)
+    , valid_ptr_flag (obj.valid_ptr_flag)
     {}
+
+    ~ScriptableWrapper()
+    {
+        // Clear obj's wrapper if obj is still alive
+        if (*valid_ptr_flag)
+            obj.wrapper = nullptr;
+    }
 
     inline BC& getWrappedObject() { return obj; }
     BC& obj;
+    std::shared_ptr<bool> valid_ptr_flag;
 };
 
 template <typename BaseClass>
@@ -1092,9 +1101,13 @@ private:
             if constexpr (ArgsLength > 0)
             {
                 if constexpr (std::is_same_v<decltype (std::get<0>(*cppArgs)), const script::Arguments&>)
+                {
                     cppArgs.emplace (args);
+                }
                 else
-                    cppArgs.emplace (std::get<index>(*typeHolders).template toCpp<Args>()...);
+                {
+                    cppArgs.emplace (std::get<index>(*typeHolders).template toCpp<std::remove_pointer_t<Args>>()...);
+                }
             }
 
             if constexpr (std::is_same_v<Ret, void>)
@@ -1120,7 +1133,8 @@ private:
 
                 try
                 {
-                    return script::converter::Converter<Ret>::toScript (ret);
+                    using Return = std::remove_pointer_t< std::decay_t<Ret> >;
+                    return internal::TypeConverter<Return>::toScript(std::forward<Ret>(ret));
                 }
                 catch (const script::Exception& e)
                 {
@@ -1139,13 +1153,13 @@ private:
                                     throwForOverload);
         }
     };
-
-    template<typename IdentifierType, typename CLASS,typename VarType>
-    script::InstanceGetterCallback getFunction (const IdentifierType& name, VarType CLASS::* getFunc)
+    
+    template<typename IdentifierType, typename ClassName, typename VarType>
+    script::InstanceGetterCallback getFunction (const IdentifierType& name, VarType ClassName::* getFunc)
     {
         return [name, getFunc] (WrapperClass* w)
         {
-            using FunctionTraits = script::internal::FuncTrait<VarType CLASS::*>;
+            using FunctionTraits = script::internal::FuncTrait<VarType ClassName::*>;
             using RT = typename FunctionTraits::ReturnType;
 
             auto result = (w->getWrappedObject().*getFunc) (name);
@@ -1153,12 +1167,12 @@ private:
         };
     }
 
-    template<typename IdentifierType, typename CLASS,typename VarType>
-    script::InstanceSetterCallback setFunction (const IdentifierType& name, VarType CLASS::* setFunc)
+    template<typename IdentifierType, typename ClassName, typename VarType>
+    script::InstanceSetterCallback setFunction (const IdentifierType& name, VarType ClassName::* setFunc)
     {
         return [name, setFunc] (WrapperClass* w, const script::Local<script::Value>& value)
         {
-            using FunctionTraits = script::internal::FuncTrait<VarType CLASS::*>;
+            using FunctionTraits = script::internal::FuncTrait<VarType ClassName::*>;
             using ArgTraits = script::internal::traits::TupleTrait<typename FunctionTraits::Arguments>;
             using ValueArg = std::decay_t<typename ArgTraits::template Arg<2>>; // Get base type for setFuncs 3rd argument - eg. const int& -> int
 
@@ -1221,8 +1235,8 @@ public:
         this->constructor_ = [](const script::Arguments&) { return nullptr; };
     }
 
-    template<typename CLASS,typename VarType>
-    WrappedClassDefineBuilder& insProp (const std::string& name, VarType CLASS::* getFunc)
+    template<typename VarType>
+    WrappedClassDefineBuilder& insProp (const std::string& name, VarType BaseClass::* getFunc)
     {
         const auto getter = [getFunc] (WrapperClass* w)
         {
@@ -1268,15 +1282,15 @@ public:
         return *this;
     }
 
-    template<typename IdentifierType, typename CLASS,typename VarType>
-    WrappedClassDefineBuilder& insAttr (const IdentifierType& name, VarType CLASS::* getFunc)
+    template<typename IdentifierType, typename ClassName, typename VarType>
+    WrappedClassDefineBuilder& insAttr (const IdentifierType& name, VarType ClassName::* getFunc)
     {
         this->instanceProperty (name, getFunction (name, getFunc), nullptr);
         return *this;
     }
 
-    template<typename IdentifierType, typename CLASS, typename VarType, typename BarType>
-    WrappedClassDefineBuilder& insWriteAttr (const IdentifierType& name, VarType CLASS::* getFunc, BarType CLASS::* setFunc)
+    template<typename IdentifierType, typename ClassName, typename VarType, typename BarType>
+    WrappedClassDefineBuilder& insWriteAttr (const IdentifierType& name, VarType ClassName::* getFunc, BarType ClassName::* setFunc)
     {
         this->instanceProperty (name, getFunction (name, getFunc), setFunction (name, setFunc));
         return *this;
