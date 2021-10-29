@@ -1062,6 +1062,31 @@ public:
     std::shared_ptr<bool> valid_ptr_flag;
 };
 
+template<typename Tuple>
+struct MsvcWorkaround;
+
+template<>
+struct MsvcWorkaround<std::tuple<>>
+{
+  static constexpr bool value = false;
+};
+
+template<typename... Rest>
+struct MsvcWorkaround<std::tuple<Rest...>>
+{
+  static constexpr bool value = false;
+};
+
+template<>
+struct MsvcWorkaround<std::tuple<script::Arguments>>
+{
+  static constexpr bool value = true;
+};
+
+template<typename Tuple>
+inline constexpr bool IsScriptArgumentsOnly_v
+ = MsvcWorkaround<Tuple>::value;
+
 template <typename BaseClass>
 class WrappedClassDefineBuilder : public script::ClassDefineBuilder<ScriptableWrapper<BaseClass>>
 {
@@ -1082,20 +1107,19 @@ private:
         static constexpr auto ArgsLength = sizeof...(Args);
 
         using TypeHolderTupleType = std::tuple<script::internal::TypeHolder<Args>...>;
+        using CppTypes = std::tuple<std::remove_pointer_t<typename internal::ConverterDecay<Args>::type>...>;
 
         template <typename Func, typename Base, size_t... index>
         static script::Local<script::Value> callInstanceFunc (Func& func, Base* ins, const script::Arguments& args,
                                                               std::index_sequence<index...>, bool nothrow,
                                                               bool /*throwForOverload*/)
         {
-            std::optional<TypeHolderTupleType> typeHolders;
-            std::optional<typename std::tuple<Args...>> cppArgs;
-
+            // Ensure the number of JS passed arguments matched the expected C++ arguments
             if (args.size() != ArgsLength)
             {
                 if constexpr (ArgsLength > 0)
                 {
-                    if constexpr (! std::is_same_v<decltype (std::get<0>(*cppArgs)), const script::Arguments&>)
+                    if constexpr (! std::is_same_v<std::tuple_element_t<0, CppTypes>, script::Arguments>)
                     {
                         // fail fast
                         if (nothrow) return {};
@@ -1105,48 +1129,80 @@ private:
                     }
                 }
             }
+
+            std::optional<TypeHolderTupleType> typeHolders;
+
+            // cppArgs tuple must use the decayed types of Args
+            // Otherwise the C++ functions expecting references won't work
+            std::optional<std::tuple<Base&, typename internal::ConverterDecay<Args>::type...>> cppArgs;
+
+            using DecayedReturn = std::remove_pointer_t<typename internal::ConverterDecay<Ret>::type>; // Given 'const Element*' == 'Element'
+
             typeHolders.emplace (args[index]...);
+
+            // Setup cppArgs tuple, first element is always a reference to the base type, this allows the std::apply to work with lambdas and member function pointers
             if constexpr (ArgsLength > 0)
             {
-                if constexpr (std::is_same_v<decltype (std::get<0>(*cppArgs)), const script::Arguments&>)
+                // if constexpr (std::is_same_v<std::tuple_element_t<0, CppTypes>, script::Arguments>)
+
+                // This is a workaround for MSVC - The above works with clang
+                // MSVC tries to evaluate the expression even though the ArgsLength check above is false - So it tries to get an element from an empty tuple
+                // So we use the struct MsvcWorkaround above to only return true if the tuple passed in has a single element and that has the type script::Arguments
+
+                if constexpr (IsScriptArgumentsOnly_v<CppTypes>)
                 {
-                    cppArgs.emplace (args);
+                    //cppArgs.emplace (*ins, args);
+
+                    // I'd like to replace everything within this if branch with the above line but I couldn't think of how to
+                    // emplace const Arguments& to the tuple which is expecting the decayed type - Arguments
+
+                    // So we just make a tuple with the Base& and const Arguments& and std::apply in place
+                    if constexpr (std::is_same_v<Ret, void>)
+                    {
+                        std::apply(func, std::tuple<Base&, const script::Arguments&>{ *ins, args });
+                        return {};
+                    }
+                    else
+                    {
+                        auto ret = std::apply(func, std::tuple<Base&, const script::Arguments&>{ *ins, args });
+                        try
+                        {
+                            return internal::TypeConverter<DecayedReturn>::toScript(std::forward<Ret>(ret));
+                        }
+                        catch (const Exception& e)
+                        {
+                            return internal::handleException(e, nothrow);
+                        }
+                    }
                 }
                 else
                 {
-                    cppArgs.emplace (std::get<index>(*typeHolders).template toCpp<std::remove_pointer_t<Args>>()...);
+                    // Add Base& followed by all of the JS arguments having called Converter<>::toCpp on each
+                    cppArgs.emplace(*ins, std::get<index>(*typeHolders).template toCpp<std::remove_pointer_t<typename internal::ConverterDecay<Args>::type>>()...);
                 }
             }
+            else
+            {
+                // Just add Base& to our tuple
+                cppArgs.emplace(*ins);
+            }
 
+            // Call an invokable (lambda, member function pointer etc.) with our cppArgs tuple
             if constexpr (std::is_same_v<Ret, void>)
             {
-                std::apply ([&](Args const&... tupleArgs)
-                {
-                    if constexpr (std::is_member_function_pointer_v<Func>)
-                        (ins->*func) (tupleArgs ...);
-                    else
-                        func (*ins, tupleArgs ...);
-                }, *std::move (cppArgs));
+                std::apply(func, *std::move(cppArgs));
                 return {};
             }
             else
             {
-                auto ret = std::apply ([&](Args const&... tupleArgs)
-                {
-                    if constexpr (std::is_member_function_pointer_v<Func>)
-                        return (ins->*func) (tupleArgs ...);
-                    else
-                        return func (*ins, tupleArgs ...);
-                }, *std::move (cppArgs));
-
+                auto ret = std::apply(func, *std::move(cppArgs));
                 try
                 {
-                    using Return = std::remove_pointer_t< std::decay_t<Ret> >;
-                    return internal::TypeConverter<Return>::toScript(std::forward<Ret>(ret));
+                    return internal::TypeConverter<DecayedReturn>::toScript(std::forward<Ret>(ret));
                 }
-                catch (const script::Exception& e)
+                catch (const Exception& e)
                 {
-                    return script::internal::handleException (e, nothrow);
+                    return internal::handleException(e, nothrow);
                 }
             }
         }
