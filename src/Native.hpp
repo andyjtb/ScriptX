@@ -1316,6 +1316,33 @@ public:
         return *this;
     }
 
+    template<typename GetLambda, typename SetLambda>
+    WrappedClassDefineBuilder& insSettablePropLambda (const std::string& name, GetLambda getFunc, SetLambda setFunc)
+    {
+        const auto getter = [getFunc] (WrapperClass* w)
+        {
+            using FunctionTraits = script::internal::FuncTrait<GetLambda>;
+            using Return = typename FunctionTraits::ReturnType;
+
+            return script::converter::Converter<Return>::toScript (getFunc (w->getWrappedObject()));
+        };
+
+        const auto setter = [setFunc] (WrapperClass* w, const script::Local<script::Value>& value)
+        {
+            using FunctionTraits = script::internal::FuncTrait<SetLambda>;
+            using Return = typename FunctionTraits::ReturnType;
+
+            using ArgTraits = script::internal::traits::TupleTrait<typename FunctionTraits::Arguments>;
+            using ValueArg = std::decay_t<typename ArgTraits::template Arg<1>>; // Get the setter functions's expected type
+
+            setFunc (w->getWrappedObject(), script::converter::Converter<ValueArg>::toCpp (value));
+        };
+
+        this->instanceProperty (name, getter, setter);
+
+        return *this;
+    }
+
     template<typename FunctionPointer>
     WrappedClassDefineBuilder& insFunc (const std::string& name, FunctionPointer member)
     {
