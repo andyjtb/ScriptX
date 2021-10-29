@@ -1180,16 +1180,35 @@ private:
         };
     }
 
+    bool hasFunction (const std::string& name)
+    {
+        for (auto& func : this->functions_)
+            if (func.name == name)
+                return true;
+
+        for (auto& func : this->insFunctions_)
+            if (func.name == name)
+                return true;
+
+        return false;
+    }
+
     template<typename OtherClass>
-    void copyFunctions (const WrappedClassDefineBuilder<OtherClass>& define)
+    void copyFunctions (const WrappedClassDefineBuilder<OtherClass>& define, bool overwriteExisting)
     {
         for (auto& funcDef : define.functions_)
         {
+            if (! overwriteExisting && hasFunction (funcDef.name))
+                continue;
+
             this->function (funcDef.name, funcDef.callback);
         }
 
         for (auto& insFuncDef : define.insFunctions_)
         {
+            if (! overwriteExisting && hasFunction (insFuncDef.name))
+                continue;
+
             this->instanceFunction (insFuncDef.name, [insFuncDef](WrapperClass* w, const Arguments& args)
             {
                 auto converted = new ScriptableWrapper<OtherClass> (w->getWrappedObject());
@@ -1198,16 +1217,35 @@ private:
         }
     }
 
+    bool hasProperty (const std::string& name)
+    {
+        for (auto& prop : this->properties)
+            if (prop.name == name)
+                return true;
+
+        for (auto& prop : this->insProperties_)
+            if (prop.name == name)
+                return true;
+
+        return false;
+    }
+
     template<typename OtherClass>
-    void copyProperties (const WrappedClassDefineBuilder<OtherClass>& define)
+    void copyProperties (const WrappedClassDefineBuilder<OtherClass>& define, bool overwriteExisting)
     {
         for (auto& propDef : define.properties)
         {
+            if (! overwriteExisting && hasProperty (propDef.name))
+                continue;
+
             this->property (propDef.name, propDef.getter, propDef.setter);
         }
 
         for (auto& insPropDef : define.insProperties_)
         {
+            if (! overwriteExisting && hasProperty (insPropDef.name))
+                continue;
+
             std::function<Local<Value>(WrapperClass*)> getter = [insPropDef](WrapperClass* w)
             {
                 auto converted = new ScriptableWrapper<OtherClass> (w->getWrappedObject());
@@ -1299,8 +1337,15 @@ public:
     template<typename OtherClass>
     void inheritFrom (const WrappedClassDefineBuilder<OtherClass>& define)
     {
-        copyProperties (define);
-        copyFunctions (define);
+        copyProperties (define, false);
+        copyFunctions (define, false);
+    }
+
+    template<typename OtherClass>
+    void inheritFromOverwrite (const WrappedClassDefineBuilder<OtherClass>& define)
+    {
+        copyProperties (define, true);
+        copyFunctions (define, true);
     }
 };
 
