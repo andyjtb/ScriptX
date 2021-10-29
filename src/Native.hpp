@@ -1273,6 +1273,12 @@ public:
         this->constructor_ = [](const script::Arguments&) { return nullptr; };
     }
 
+    WrappedClassDefineBuilder& constructor(InstanceConstructor<WrapperClass> constructor)
+    {
+        this->constructor_ = std::move (constructor);
+        return *this;
+    }
+
     template<typename VarType>
     WrappedClassDefineBuilder& insProp (const std::string& name, VarType BaseClass::* getFunc)
     {
