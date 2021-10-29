@@ -1036,6 +1036,14 @@ class ScriptableWrapper : public script::ScriptClass
 public:
     using Type = BC;
 
+    // Use if engine has provided an object
+    // e.g in your defined class constructor call
+    ScriptableWrapper (BC& object, const Local<Object>& scriptObject)
+    : script::ScriptClass (scriptObject)
+    , obj (object)
+    , valid_ptr_flag (obj.valid_ptr_flag)
+    {}
+
     ScriptableWrapper (BC& object)
     : script::ScriptClass (script::ScriptClass::ConstructFromCpp<ScriptableWrapper>{})
     , obj (object)
