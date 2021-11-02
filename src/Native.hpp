@@ -1240,7 +1240,7 @@ private:
             using ArgTraits = script::internal::traits::TupleTrait<typename FunctionTraits::Arguments>;
             using ValueArg = std::decay_t<typename ArgTraits::template Arg<2>>; // Get base type for setFuncs 3rd argument - eg. const int& -> int
 
-            return (w->getWrappedObject().*setFunc) (name, script::converter::Converter<ValueArg>::toCpp (value), true);
+            return (w->getWrappedObject().*setFunc) (name, script::converter::Converter<ValueArg>::toCpp (value), true, true);
         };
     }
 
