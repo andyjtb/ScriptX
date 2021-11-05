@@ -1244,6 +1244,24 @@ private:
         };
     }
 
+    template<typename ClassName, typename VarType>
+    script::InstanceGetterCallback<WrapperClass> getFunction (VarType ClassName::* variablePtr)
+    {
+        return [variablePtr] (WrapperClass* w)
+        {
+            return script::converter::Converter<VarType>::toScript (std::reference_wrapper<VarType> (w->getWrappedObject().*variablePtr));
+        };
+    }
+
+    template<typename ClassName, typename VarType>
+    script::InstanceSetterCallback<WrapperClass> setFunction (VarType ClassName::* variablePtr)
+    {
+        return [variablePtr] (WrapperClass* w, const script::Local<script::Value>& value)
+        {
+            w->getWrappedObject().*variablePtr = script::converter::Converter<VarType>::toCpp (value);
+        };
+    }
+
     bool hasFunction (const std::string& name)
     {
         for (auto& func : this->functions_)
@@ -1344,14 +1362,17 @@ public:
     }
 
     template<typename VarType>
-    WrappedClassDefineBuilder& insProp (const std::string& name, VarType BaseClass::* getFunc)
+    WrappedClassDefineBuilder& insProp (const std::string& name, VarType BaseClass::* variablePtr)
     {
-        const auto getter = [getFunc] (WrapperClass* w)
-        {
-            return script::converter::Converter<VarType>::toScript (std::reference_wrapper<VarType> (w->getWrappedObject().*getFunc));
-        };
+        this->instanceProperty (name, getFunction (variablePtr), nullptr);
 
-        this->instanceProperty (name, getter, nullptr);
+        return *this;
+    }
+
+    template<typename VarType>
+    WrappedClassDefineBuilder& insSettableProp (const std::string& name, VarType BaseClass::* variablePtr)
+    {
+        this->instanceProperty (name, getFunction (variablePtr), setFunction (variablePtr));
 
         return *this;
     }
