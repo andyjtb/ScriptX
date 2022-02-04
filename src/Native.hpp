@@ -962,6 +962,7 @@ class NativeRegister {
   void (*visitFunc_)(const void* def, ClassDefineVisitor& visitor);
 #endif
 
+public:
   const void* define_;
 
   template <typename T>

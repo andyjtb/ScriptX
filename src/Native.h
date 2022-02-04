@@ -559,6 +559,8 @@ class ClassDefine : private internal::ClassDefineState {
 
   const std::string& getNameSpace() const { return nameSpace; }
 
+    std::vector<NativeRegister> inheritingClasses;
+
  private:
   ClassDefine(std::string&& className, std::string&& nameSpace,
               internal::StaticDefine&& staticDefine, internal::InstanceDefine&& instanceDefine)

@@ -353,6 +353,14 @@ bool JscEngine::performIsInstanceOf(const Local<script::Value>& value,
     return JSValueIsObjectOfClass(context_, toJsc(context_, value), it->second.instanceClass);
   }
 
+//    for (auto& inheriting : classDefine->inheritingClasses)
+//    {
+//        auto it = classRegistry_.find(inheriting.define_);
+//        if (it != classRegistry_.end() && !it->second.constructor.isEmpty()) {
+//          return JSValueIsObjectOfClass(context_, toJsc(context_, value), it->second.instanceClass);
+//        }
+//    }
+
   return false;
 }
 
@@ -362,6 +370,14 @@ void* JscEngine::performGetNativeInstance(const Local<script::Value>& value,
     return static_cast<ScriptClass*>(JSObjectGetPrivate(value.asObject().val_))
         ->internalState_.polymorphicPointer;
   }
+
+    for (auto& inheriting : classDefine->inheritingClasses)
+    {
+        auto it = classRegistry_.find(inheriting.define_);
+        if (it != classRegistry_.end() && !it->second.constructor.isEmpty()) {
+            return reinterpret_cast<T*>(JSObjectGetPrivate(value.asObject().val_));
+        }
+    }
   return nullptr;
 }
 
