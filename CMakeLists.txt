@@ -74,7 +74,7 @@ add_library(ScriptX STATIC
         ${SCRIPTX_DIR}/src/utils/TypeInformation.h
         )
 
-target_include_directories(ScriptX PUBLIC ${SCRIPTX_DIR}/src/include)
+target_include_directories(ScriptX SYSTEM PUBLIC ${SCRIPTX_DIR}/src/include)
 
 ###### config implementation ######
 
