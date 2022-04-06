@@ -962,6 +962,8 @@ class NativeRegister {
   void (*visitFunc_)(const void* def, ClassDefineVisitor& visitor);
 #endif
 
+  const void* define_;
+
   template <typename T>
   explicit NativeRegister(const ClassDefine<T>* define) : registerFunc_(nullptr), define_(define) {
     registerFunc_ = [](const void* def, ScriptEngine* engine) {
@@ -978,8 +980,6 @@ class NativeRegister {
   friend class ClassDefine;
 
  public:
-  const void* define_;
-
   /**
    * register the wrapped class define to engine.
    * this is equivalent to call
