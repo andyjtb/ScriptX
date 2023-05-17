@@ -842,6 +842,36 @@ class InstanceDefineBuilder : public InstanceDefineBuilderState {
         std::move(name), std::move(prop.first), std::move(prop.second), {}});
     return thiz();
   }
+
+  template <typename Container, typename G, typename S = InstanceSetterCallback<T>>
+  ClassDefineBuilder<T>& mapInstanceProperties(const Container& names, G&& getter, S&& setterCallback = nullptr,
+           bool nothrow = internal::kBindingNoThrowDefaultValue) {
+    for (auto& prop : names)
+    {
+        const auto getFunc = [getter, prop] (T* w)
+        {
+            using FunctionTraits = script::internal::FuncTrait<G>;
+            using Return = typename FunctionTraits::ReturnType;
+
+            return script::converter::Converter<Return>::toScript (getter (w, prop.data()));
+        };
+
+        const auto setter = [setterCallback, prop] (T* w, const script::Local<script::Value>& value)
+        {
+            using FunctionTraits = script::internal::FuncTrait<S>;
+            using Return = typename FunctionTraits::ReturnType;
+
+            using ArgTraits = script::internal::traits::TupleTrait<typename FunctionTraits::Arguments>;
+            using ValueArg = std::decay_t<typename ArgTraits::template Arg<1>>; // Get the setter functions's expected type
+
+            setterCallback (w, prop.data(), script::converter::Converter<ValueArg>::toCpp (value));
+        };
+
+        instanceProperty (std::string(prop), getFunc, setter);
+    }
+
+    return thiz;
+  }
 };
 
 // specialize for void
