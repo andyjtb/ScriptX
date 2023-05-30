@@ -862,7 +862,7 @@ class InstanceDefineBuilder : public InstanceDefineBuilderState {
             using Return = typename FunctionTraits::ReturnType;
 
             using ArgTraits = script::internal::traits::TupleTrait<typename FunctionTraits::Arguments>;
-            using ValueArg = std::decay_t<typename ArgTraits::template Arg<1>>; // Get the setter functions's expected type
+            using ValueArg = std::decay_t<typename ArgTraits::template Arg<2>>; // Get the setter functions's expected type
 
             setterCallback (w, prop.data(), script::converter::Converter<ValueArg>::toCpp (value));
         };
