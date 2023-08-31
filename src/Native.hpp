@@ -1139,6 +1139,8 @@ private:
         using TypeHolderTupleType = std::tuple<script::internal::TypeHolder<Args>...>;
         using CppTypes = std::tuple<std::remove_pointer_t<typename internal::ConverterDecay<Args>::type>...>;
 
+#pragma warning(disable: 4702)
+
         template <typename Func, typename Base, size_t... index>
         static script::Local<script::Value> callInstanceFunc (Func& func, Base* ins, const script::Arguments& args,
                                                               std::index_sequence<index...>, bool nothrow,
@@ -1236,6 +1238,8 @@ private:
                 }
             }
         }
+
+#pragma warning(pop)
 
      public:
 
