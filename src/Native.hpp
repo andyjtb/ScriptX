@@ -1136,9 +1136,6 @@ private:
     private:
         static constexpr auto ArgsLength = sizeof...(Args);
 
-        using TypeHolderTupleType = std::tuple<script::internal::TypeHolder<Args>...>;
-        using CppTypes = std::tuple<std::remove_pointer_t<typename internal::ConverterDecay<Args>::type>...>;
-
 #pragma warning(disable: 4702)
 
         template <typename Func, typename Base, size_t... index>
@@ -1151,6 +1148,7 @@ private:
             {
                 if constexpr (ArgsLength > 0)
                 {
+                    using CppTypes = std::tuple<std::remove_pointer_t<typename internal::ConverterDecay<Args>::type>...>;
                     if constexpr (! std::is_same_v<std::tuple_element_t<0, CppTypes>, script::Arguments>)
                     {
                         // fail fast
@@ -1162,6 +1160,7 @@ private:
                 }
             }
 
+            using TypeHolderTupleType = std::tuple<script::internal::TypeHolder<Args>...>;
             std::optional<TypeHolderTupleType> typeHolders;
 
             // cppArgs tuple must use the decayed types of Args
@@ -1180,6 +1179,7 @@ private:
                 // This is a workaround for MSVC - The above works with clang
                 // MSVC tries to evaluate the expression even though the ArgsLength check above is false - So it tries to get an element from an empty tuple
                 // So we use the struct MsvcWorkaround above to only return true if the tuple passed in has a single element and that has the type script::Arguments
+                using CppTypes = std::tuple<std::remove_pointer_t<typename internal::ConverterDecay<Args>::type>...>;
 
                 if constexpr (IsScriptArgumentsOnly_v<CppTypes>)
                 {
