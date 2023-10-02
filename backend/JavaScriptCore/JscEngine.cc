@@ -43,8 +43,8 @@ JscEngine::JscEngine(std::shared_ptr<utils::MessageQueue> mq)
     externalClass_ = JSClassCreate(&external);
   });
 
-  virtualMachine_ = JSContextGroupCreate();
-  context_ = JSGlobalContextCreateInGroup(virtualMachine_, globalClass_);
+  contextGroup_ = std::make_unique<script::internal::SharedResourcePointer<ContextGroup>>();
+  context_ = JSGlobalContextCreateInGroup(*(*contextGroup_), globalClass_);
   JSObjectSetPrivate(JSContextGetGlobalObject(context_), this);
 
   initInternalSymbols();
@@ -79,9 +79,7 @@ void JscEngine::destroy() noexcept {
   messageQueue_->removeMessageByTag(this);
 
   JSGlobalContextRelease(context_);
-  JSContextGroupRelease(virtualMachine_);
-
-  delete this;
+  contextGroup_ = nullptr;
 }
 
 void JscEngine::initInternalSymbols() {

@@ -28,7 +28,7 @@ JscEngine& currentEngineChecked() { return EngineScope::currentEngineCheckedAs<J
 JSGlobalContextRef currentEngineContextChecked() { return currentEngineChecked().context_; }
 
 JSContextGroupRef currentEngineContextGroupChecked() {
-  return currentEngineChecked().virtualMachine_;
+  return *(*currentEngineChecked().contextGroup_);
 }
 
 }  // namespace script::jsc_backend

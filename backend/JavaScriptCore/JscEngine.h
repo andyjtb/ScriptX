@@ -27,6 +27,57 @@
 
 namespace script::internal {
 
+template <typename SharedObjectType>
+class SharedResourcePointer
+{
+public:
+    SharedResourcePointer()
+    {
+        auto& holder = getSharedObjectHolder();
+        const std::lock_guard<std::mutex> sl (holder.lock);
+
+        if (++(holder.refCount) == 1)
+            holder.sharedInstance.reset (new SharedObjectType());
+
+        sharedObject = holder.sharedInstance.get();
+    }
+
+    SharedResourcePointer (const SharedResourcePointer&)
+    : SharedResourcePointer()
+    {
+    }
+
+    ~SharedResourcePointer()
+    {
+        auto& holder = getSharedObjectHolder();
+        const std::lock_guard<std::mutex> sl (holder.lock);
+
+        if (--(holder.refCount) == 0)
+            holder.sharedInstance = nullptr;
+    }
+
+    operator SharedObjectType*() const noexcept         { return sharedObject; }
+    SharedObjectType* operator->() const noexcept       { return sharedObject; }
+
+private:
+    struct SharedObjectHolder
+    {
+        std::mutex lock;
+        std::unique_ptr<SharedObjectType> sharedInstance;
+        std::atomic<int> refCount{ 0 };
+    };
+
+    static SharedObjectHolder& getSharedObjectHolder() noexcept
+    {
+        static SharedObjectHolder holder;
+        return holder;
+    }
+
+    SharedObjectType* sharedObject;
+
+    SharedResourcePointer& operator= (const SharedResourcePointer&) = delete;
+};
+
 // forward declare
 // defined in JscEngine.h
 template <typename T, typename Args>
@@ -57,9 +108,32 @@ class JscEngine : public ::script::ScriptEngine {
   static bool hasByteBufferAPI_;
 
  protected:
+    class ContextGroup
+    {
+    public:
+        ContextGroup()
+        {
+            std::lock_guard<std::recursive_mutex> lk (lock);
+            contextGroup = JSContextGroupCreate();
+        }
+
+        ~ContextGroup()
+        {
+            std::lock_guard<std::recursive_mutex> lk (lock);
+            JSContextGroupRelease (contextGroup);
+        }
+
+        operator JSContextGroupRef() { return contextGroup; }
+
+    private:
+        std::recursive_mutex lock;
+        JSContextGroupRef contextGroup;
+    };
+
   std::shared_ptr<std::recursive_mutex> virtualMachineLock_ =
       std::make_shared<std::recursive_mutex>();
-  JSContextGroupRef virtualMachine_ = nullptr;
+  std::unique_ptr<script::internal::SharedResourcePointer<ContextGroup>> contextGroup_;
+
   JSGlobalContextRef context_ = nullptr;
   Global<Value> internalStorageSymbol_;
   Global<Value> constructorMarkSymbol_;

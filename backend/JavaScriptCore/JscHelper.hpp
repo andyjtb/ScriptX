@@ -72,7 +72,7 @@ struct jsc_interop {
    * get JSContextGroupRef from JscEngine
    */
   static JSContextGroupRef getEngineContextGroup(jsc_backend::JscEngine* engine) {
-    return engine->virtualMachine_;
+    return *(*engine->contextGroup_);
   }
 
   /**
