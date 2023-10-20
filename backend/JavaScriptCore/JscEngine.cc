@@ -47,6 +47,13 @@ JscEngine::JscEngine(std::shared_ptr<utils::MessageQueue> mq)
   context_ = JSGlobalContextCreateInGroup(*(*contextGroup_), globalClass_);
   JSObjectSetPrivate(JSContextGetGlobalObject(context_), this);
 
+#ifndef NDEBUG
+#ifdef TARGET_OS_MAC
+  if (__builtin_available(macOS 13.3, iOS 16.4, tvOS 16.4, *))
+    JSGlobalContextSetInspectable(context_, true);
+#endif
+#endif
+
   initInternalSymbols();
 }
 
