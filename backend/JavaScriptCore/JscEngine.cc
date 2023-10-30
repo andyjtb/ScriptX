@@ -49,8 +49,10 @@ JscEngine::JscEngine(std::shared_ptr<utils::MessageQueue> mq)
 
 #ifndef NDEBUG
 #ifdef TARGET_OS_MAC
-  if (__builtin_available(macOS 13.3, iOS 16.4, tvOS 16.4, *))
+#ifdef JSCONTEXT_INSPECTABLE
+  if (__builtin_available(macOS 14.0, iOS 16.4, tvOS 16.4, *))
     JSGlobalContextSetInspectable(context_, true);
+#endif
 #endif
 #endif
 

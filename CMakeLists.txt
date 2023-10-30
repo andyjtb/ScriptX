@@ -96,6 +96,10 @@ elseif (${SCRIPTX_BACKEND} STREQUAL ${SCRIPTX_BACKEND_JAVASCRIPTCORE})
             -DSCRIPTX_BACKEND_TRAIT_PREFIX=../backend/JavaScriptCore/trait/Trait
     )
 
+    if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND CMAKE_HOST_SYSTEM_VERSION VERSION_GREATER_EQUAL 23)
+        target_compile_definitions(ScriptX PUBLIC JSCONTEXT_INSPECTABLE=1)
+    endif()
+
 elseif (${SCRIPTX_BACKEND} STREQUAL ${SCRIPTX_BACKEND_SPIDERMONKEY})
 
     include(${SCRIPTX_DIR}/backend/SpiderMonkey/CMakeLists.txt)
