@@ -128,7 +128,8 @@ void JscWeakRef::reset(JscEngine* engine) {
 
   std::lock_guard lock(*engine->virtualMachineLock_);
   if (managedValue_) {
-    JSWeakRelease(engine->virtualMachine_, static_cast<JSWeakRef>(managedValue_));
+    JSContextGroupRef context = *(*(engine->contextGroup_.get()));
+    JSWeakRelease(context, static_cast<JSWeakRef>(managedValue_));
     managedValue_ = nullptr;
   } else if (nonObject_) {
     JSValueUnprotect(engine->context_, nonObject_);
