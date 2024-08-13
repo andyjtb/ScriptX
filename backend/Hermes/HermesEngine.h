@@ -1,6 +1,6 @@
 /*
  * Tencent is pleased to support the open source community by making ScriptX available.
- * Copyright (C) 2021 THL A29 Limited, a Tencent company.  All rights reserved.
+ * Copyright (C) 2023 THL A29 Limited, a Tencent company.  All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,77 +17,55 @@
 
 #pragma once
 
-#include <atomic>
-#include <functional>
-#include <mutex>
-#include <type_traits>
-
 #include "../../src/Engine.h"
 #include "../../src/Exception.h"
+#include "../../src/Native.h"
 #include "../../src/utils/GlobalWeakBookkeeping.hpp"
 #include "../../src/utils/MessageQueue.h"
-#include "QjsHelper.h"
 
-namespace script::qjs_backend {
+#include "HermesHelper.h"
+#include "HermesTypedArrayApi.h"
 
-using RawFunctionCallback = Local<Value> (*)(const Arguments& args, void* data1, void* data2,
-                                             bool isConstructorCall);
+namespace script::hermes_backend {
 
-class QjsEngine : public ScriptEngine {
+struct SharedScriptClassHolder;
+
+class HermesEngine : public ScriptEngine {
  private:
-  static JSClassID kPointerClassId;
-  /**
-   * for Function::newFunction
-   *
-   */
-  static JSClassID kFunctionDataClassId;
-  static JSClassID kInstanceClassId;
-
-  std::shared_ptr<::script::utils::MessageQueue> queue_;
-  JSRuntime* runtime_ = nullptr;
-  JSContext* context_ = nullptr;
-
-  std::recursive_mutex runtimeLock_{};
-
-  // state
-  int pauseGcCount_ = 0;
   bool isDestroying_ = false;
   std::atomic_bool tickScheduled_ = false;
 
-  /**
-   * key: ClassDefine
-   * value: prototype, constructor
-   */
-  std::unordered_map<const void*, std::pair<JSValue, JSValue>> nativeInstanceRegistry_;
+ protected:
+  struct ClassRegistryData {
+    Global<Object> constructor{};
+    Global<Object> prototype{};
+    script::ScriptClass* (*instanceTypeToScriptClass)(void*) = nullptr;
+  };
+
+  std::shared_ptr<utils::MessageQueue> messageQueue_;
+  HermesRuntime* runtime_ = nullptr;
 
   internal::GlobalWeakBookkeeping globalWeakBookkeeping_{};
 
-  JSAtom lengthAtom_ = {};
-  // QuickJs C API is not enough, we have to use some js helper code.
-  JSValue helperFunctionStrictEqual_ = {};
-  JSValue helperFunctionIsByteBuffer_ = {};
-  JSValue helperFunctionGetByteBufferInfo_ = {};
-  JSAtom helperSymbolInternalStore_ = JS_ATOM_NULL;
+  std::unordered_map<const void*, ClassRegistryData> classRegistry_;
 
  public:
-  using QjsFactory = std::function<std::pair<JSRuntime*, JSContext*>()>;
+  HermesEngine(std::shared_ptr<::script::utils::MessageQueue> queue);
 
- public:
-  explicit QjsEngine(std::shared_ptr<::script::utils::MessageQueue> queue = nullptr,
-                     const QjsFactory& factory = nullptr);
+  HermesEngine();
 
-  SCRIPTX_DISALLOW_COPY_AND_MOVE(QjsEngine);
+  SCRIPTX_DISALLOW_COPY_AND_MOVE(HermesEngine);
 
   void destroy() noexcept override;
 
   bool isDestroying() const override;
 
+  Local<Object> getGlobal();
+
   Local<Value> get(const Local<String>& key) override;
 
   void set(const Local<String>& key, const Local<Value>& value) override;
   using ScriptEngine::set;
-
-  Local<Object> getGlobal() const;
 
   Local<Value> eval(const Local<String>& script, const Local<Value>& sourceFile);
   Local<Value> eval(const Local<String>& script, const Local<String>& sourceFile) override;
@@ -101,9 +79,8 @@ class QjsEngine : public ScriptEngine {
 
   std::shared_ptr<utils::MessageQueue> messageQueue() override;
 
-  void gc() override;
-
   size_t getHeapSize() override;
+  void gc() override;
 
   void adjustAssociatedMemory(int64_t count) override;
 
@@ -111,12 +88,19 @@ class QjsEngine : public ScriptEngine {
 
   std::string getEngineVersion() override;
 
+  facebook::jsi::Runtime& getRt();
+  facebook::hermes::HermesRuntime* getHermesRuntime();
+
  protected:
-  ~QjsEngine() override;
+  ~HermesEngine() override;
 
   void performRegisterNativeClass(
       internal::TypeIndex typeIndex, const internal::ClassDefineState* classDefine,
       script::ScriptClass* (*instanceTypeToScriptClass)(void*)) override;
+
+  Local<Object> performNewNativeClass(internal::TypeIndex typeIndex,
+                                      const internal::ClassDefineState* classDefine, size_t size,
+                                      const Local<script::Value>* args) override;
 
   void* performGetNativeInstance(const Local<script::Value>& value,
                                  const internal::ClassDefineState* classDefine) override;
@@ -124,37 +108,12 @@ class QjsEngine : public ScriptEngine {
   bool performIsInstanceOf(const Local<script::Value>& value,
                            const internal::ClassDefineState* classDefine) override;
 
-  Local<Object> performNewNativeClass(internal::TypeIndex typeIndex,
-                                      const internal::ClassDefineState* classDefine, size_t size,
-                                      const Local<script::Value>* args) override;
-
  private:
-  struct BookKeepFetcher;
-  friend struct QjsBookKeepFetcher;
-
-  void registerNativeStatic(const Local<Object>& module,
-                            const internal::StaticDefine& staticDefine);
-
-  Local<Object> newConstructor(const internal::ClassDefineState* define,
-                               ScriptClass* (*instanceTypeToScriptClass)(void* instancePointer));
-
-  Local<Object> newPrototype(const internal::ClassDefineState* define);
-
-  void initEngineResource();
-
-  /**
-   * similar to js_std_loop
-   */
-  void scheduleTick();
-
-  void extendLifeTimeToNextLoop(JSValue value);
-
   template <typename T, typename... Args>
   static T make(Args&&... args) {
     return T(std::forward<Args>(args)...);
   }
 
- private:
   template <typename T>
   friend class ::script::Local;
 
@@ -180,23 +139,52 @@ class QjsEngine : public ScriptEngine {
 
   friend class ::script::ScriptClass;
 
-  friend struct ByteBufferState;
+  friend class HermesEngineScope;
 
-  friend class PauseGc;
-
-  friend class EngineScopeImpl;
-  friend class ExitEngineScopeImpl;
-  friend struct GlobalRefState;
+  friend struct ::script::hermes_interop;
   template <typename T>
   friend struct MakeLocalInternal;
 
-  friend struct ::script::qjs_interop;
+  friend HermesRuntime* currentRuntime();
 
-  friend JSContext* currentContext();
-  friend JSRuntime* currentRuntime();
-  friend JSValue throwException(const Exception&, QjsEngine*);
-  friend Local<Function> newRawFunction(QjsEngine* engine, void* data1, void* data2,
-                                        RawFunctionCallback);
+  friend SharedScriptClassHolder;
+
+  struct BookKeepFetcher;
+  friend struct HermesBookKeepFetcher;
+
+  Local<Function> newStaticFunction(const internal::StaticDefine::FunctionDefine& func);
+
+  Local<Value> newStaticGetter(const internal::StaticDefine::PropertyDefine& prop);
+  Local<Value> newStaticSetter(const internal::StaticDefine::PropertyDefine& prop);
+
+  Local<Value> newInstanceGetter(const internal::InstanceDefine::PropertyDefine& prop);
+  Local<Value> newInstanceSetter(const internal::InstanceDefine::PropertyDefine& prop);
+
+  void registerStaticDefine(const internal::StaticDefine& staticDefine,
+                            const Local<Object>& object);
+
+  void defineInstance(const internal::ClassDefineState* classDefine, Local<Value>& object,
+                      ClassRegistryData& registry);
+
+  Local<Object> createConstructor(const internal::ClassDefineState* classDefine);
+
+  Local<Object> defineInstancePrototype(const internal::ClassDefineState* classDefine);
+
+  void defineInstanceFunction(const internal::ClassDefineState* classDefine,
+                              Local<Object>& prototypeObject);
+
+  void defineInstanceProperties(const internal::ClassDefineState* classDefine,
+                                const Local<Object>& prototype);
+
+  static void* getThisPointer(jsi::Runtime& rt, const jsi::Value& thisVal);
+
+  void scheduleTick();
+
+  void deleteScriptClass(ScriptClass* sc);
+
+  Local<Value> evalInPlaceInternal(const std::shared_ptr<facebook::jsi::Buffer>& buffer, const std::string& sourceFile);
+
+  std::unique_ptr<hermes_backend::InvalidateCacheOnDestroy> invalidatePropNameCache;
 };
 
-}  // namespace script::qjs_backend
+}  // namespace script::hermes_backend

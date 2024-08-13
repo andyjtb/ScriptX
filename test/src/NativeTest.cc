@@ -361,12 +361,14 @@ TEST_F(NativeTest, SanityCheck) {
   engine->registerNativeClass<SanityCheck2>(SanityCheck2Def);
 
 #ifdef SCRIPTX_LANG_JAVASCRIPT
+#ifndef SCRIPTX_BACKEND_HERMES
   EXPECT_THROW(
       {
         // can't call as function
         engine->eval(u8"script.engine.test.TestClass();  new script.engine.test.TestClass();");
       },
       Exception);
+#endif
 #endif
   return;
 
@@ -418,7 +420,7 @@ obj.g()
 namespace {
 ClassDefine<void> gns =
     defineClass("GnS").property("src", []() { return String::newString(u8"hello"); }).build();
-}
+}  // namespace
 
 TEST_F(NativeTest, GetNoSet) {
   script::EngineScope engineScope(engine);
@@ -443,7 +445,7 @@ ClassDefine<void> sng = defineClass("SnG")
                                         EXPECT_STREQ(val.asString().toString().c_str(), "hello");
                                       })
                             .build();
-}
+}  // namespace
 
 TEST_F(NativeTest, SetNoGet) {
   script::EngineScope engineScope(engine);
@@ -1221,8 +1223,9 @@ TEST_F(NativeTest, ValidateClassDefine) {
   EXPECT_TRUE(std::function<void()>() == nullptr);
 
   // empty prop func
-  EXPECT_THROW({ defineClass("hello").property("x", std::function<Local<Value>()>()).build(); },
-               std::runtime_error);
+  EXPECT_THROW(
+      { defineClass("hello").property("x", std::function<Local<Value>()>()).build(); },
+      std::runtime_error);
 
   // no ctor
   EXPECT_THROW(

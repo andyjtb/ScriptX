@@ -21,6 +21,47 @@ namespace script::test {
 
 DEFINE_ENGINE_TEST(InteroperateTest);
 
+#ifdef SCRIPTX_BACKEND_HERMES
+
+TEST_F(InteroperateTest, Hermes) {
+  EngineScope scope(engine);
+  auto eng = EngineScope::currentEngineAs<hermes_backend::HermesEngine>();
+  auto& runtime = *hermes_interop::getEngineRuntime(eng);
+
+  auto obj = Object::newObject();
+
+  auto jobj = hermes_interop::toHermes(obj);
+  EXPECT_TRUE(jobj->isObject());
+
+  auto jnum = facebook::jsi::Value(runtime, 3.14);
+  auto num = hermes_interop::makeLocal<Number>(std::move(jnum));
+  EXPECT_DOUBLE_EQ(num.toDouble(), 3.14);
+
+  auto jstr = facebook::jsi::String::createFromAscii(runtime, "hello world");
+  auto str = hermes_interop::makeLocal<String>(std::move(jstr));
+  EXPECT_STREQ(str.toString().c_str(), "hello world");
+
+  jstr = facebook::jsi::String::createFromAscii(runtime, "hello world");
+  auto str2 = hermes_interop::makeLocal<String>(facebook::jsi::Value(runtime, jstr));
+  EXPECT_STREQ(str2.toString().c_str(), "hello world");
+
+  auto func = Function::newFunction([](const Arguments& args) -> Local<Value> {
+    auto data = hermes_interop::extractArguments(args);
+    auto& rt = *hermes_interop::getEngineRuntime(data.engine_);
+    auto a = facebook::jsi::Value(rt, data.argv_[0]);
+    auto b = facebook::jsi::Value(rt, data.argv_[1]);
+
+    auto ret = facebook::jsi::Value(rt, a.asNumber() + b.asNumber());
+
+    return hermes_interop::makeLocal<Number>(std::move(ret));
+  });
+  auto ret = func.call({}, 1, 2);
+  ASSERT_TRUE(ret.isNumber());
+  EXPECT_EQ(ret.asNumber().toInt32(), 3);
+}
+
+#endif
+
 #ifdef SCRIPTX_BACKEND_JAVASCRIPTCORE
 
 TEST_F(InteroperateTest, JavaScriptCore) {

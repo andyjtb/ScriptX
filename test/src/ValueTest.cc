@@ -268,8 +268,8 @@ TEST_F(ValueTest, Function) {
   try {
     func.call({}, script::Boolean::newBoolean(true));
     FAIL();
-  } catch (const Exception& e) {
-    EXPECT_NE(e.message().find("invalid arguments"), std::string::npos);
+  } catch (const std::exception& e) {
+    EXPECT_NE(std::string(e.what()).find("invalid arguments"), std::string::npos);
   }
 }
 

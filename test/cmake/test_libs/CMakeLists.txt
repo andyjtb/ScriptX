@@ -24,6 +24,17 @@ if (NOT EXISTS "${SCRIPTX_TEST_LIBS}")
     if (result)
         message(FATAL_ERROR "Build step for download ScriptXLibs failed: ${result}")
     endif ()
+
+    execute_process(COMMAND
+        git clone git@github.com:facebook/hermes.git
+        RESULT_VARIABLE result
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/ScriptXTestLibs
+    )
+
+    execute_process(COMMAND
+        git checkout --force origin/facebook/static_h
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/ScriptXTestLibs/hermes
+        )
 elseif (("${SCRIPTX_TEST_FORCE_UPDATE_DEPS}" STREQUAL ON) OR ("$ENV{SCRIPTX_TEST_FORCE_UPDATE_DEPS}" STREQUAL ON))
     message(STATUS "update SCRIPTX_TEST_LIBS ${SCRIPTX_TEST_LIBS}")
     execute_process(COMMAND

@@ -184,6 +184,19 @@ script::Local<script::Value> JscEngine::eval(const script::Local<script::String>
   return eval(script, {});
 }
 
+script::Local<script::Value> JscEngine::evalInPlace(const std::string& script) {
+  return evalInPlace(script, {});
+}
+
+script::Local<script::Value> JscEngine::evalInPlace(const std::string& script, const std::string& sourceFile) {
+  // JSCore requires JSStringRef which takes a copy of the string
+  return eval(script, sourceFile);
+}
+
+script::Local<script::Value> JscEngine::evalInPlace(const char* data, size_t size, const std::string& sourceFile) {
+  return evalInPlace(std::string(data, size), {});
+}
+
 std::shared_ptr<utils::MessageQueue> JscEngine::messageQueue() { return messageQueue_; }
 
 void JscEngine::gc() {

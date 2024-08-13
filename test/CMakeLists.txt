@@ -48,9 +48,7 @@ endif ()
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 set(SCRIPTX_DIR ${CMAKE_CURRENT_LIST_DIR}/..)
-
 ########### unit test config ###########
-
 # import googletest
 include(cmake/gtest/CMakeLists.txt)
 
@@ -79,7 +77,7 @@ target_sources(UnitTests PRIVATE
 
 # 1. import ScriptX
 #   set which backend engine to use
-#set(SCRIPTX_BACKEND V8 CACHE STRING "" FORCE)
+set(SCRIPTX_BACKEND Hermes CACHE STRING "" FORCE)
 
 # we want the default behavior, so don't set this
 # set(SCRIPTX_NO_EXCEPTION_ON_BIND_FUNCTION YES CACHE BOOL "" FORCE)
@@ -97,7 +95,11 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND TEST_FLAG_ENABLE_CLANG_TIDY)
 endif ()
 
 include_directories(${DEVOPS_LIBS_INCLUDE})
-target_link_libraries(ScriptX ${DEVOPS_LIBS_LIBPATH})
+
+if (NOT ${SCRIPTX_BACKEND} STREQUAL Hermes)
+    target_link_libraries(ScriptX ${DEVOPS_LIBS_LIBPATH})
+endif()
+
 target_compile_definitions(ScriptX PUBLIC ${DEVOPS_LIBS_MARCO})
 
 # if you want to close rtti feature for ScriptX and your project
@@ -151,5 +153,51 @@ add_test(
         COMMAND UnitTests
 )
 
+if (${SCRIPTX_BACKEND} STREQUAL Hermes)
+    if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+        set(HERMES_SRC_DIR "/Users/andy/Desktop/browsers/ScriptX/test/cmake-build-debug/ScriptXTestLibs/hermes")
+        set(HERMES_BUILD_DIR "/Users/andy/Desktop/browsers/ScriptX/test/cmake-build-debug/Hermes")
+    elseif(${CMAKE_BUILD_TYPE} STREQUAL "Release")
+        set(HERMES_SRC_DIR "/Users/andy/Desktop/browsers/ScriptX/test/cmake-build-release/ScriptXTestLibs/hermes")
+        set(HERMES_BUILD_DIR "/Users/andy/Desktop/browsers/ScriptX/test/cmake-build-release/Hermes")
+    endif()
+    if (NOT HERMES_SRC_DIR)
+        message(FATAL_ERROR "Please specify HERMES_SRC_DIR")
+    endif ()
+    # Validate HERMES_SRC_DIR by checking for API/jsi/jsi/jsi.h
+    if (NOT EXISTS "${HERMES_SRC_DIR}/API/jsi/jsi/jsi.h")
+        message(FATAL_ERROR "HERMES_SRC_DIR does not contain API/jsi/jsi/jsi.h")
+    endif ()
+
+    if (NOT HERMES_BUILD_DIR)
+        message(FATAL_ERROR "Please specify HERMES_BUILD_DIR")
+    endif ()
+    # Validate HERMES_BUILD_DIR by checking for bin/hermes with the platform-specific extension
+#    if (NOT EXISTS "${HERMES_BUILD_DIR}/bin/hermes${CMAKE_EXECUTABLE_SUFFIX}")
+#        message(FATAL_ERROR "HERMES_BUILD_DIR does not contain bin/hermes${CMAKE_EXECUTABLE_SUFFIX}")
+#    endif ()
+
+    # Add Hermes include directories
+    include_directories("${HERMES_SRC_DIR}/API")
+    include_directories("${HERMES_SRC_DIR}/API/jsi")
+    include_directories("${HERMES_SRC_DIR}/public")
+
+    # Add Hermes library directories
+    link_directories("${HERMES_BUILD_DIR}/API/hermes")
+    link_directories("${HERMES_BUILD_DIR}/jsi")
+
+    #hermesvm_a
+    #target_link_libraries(ScriptX libhermes)
+    target_link_libraries(ScriptX hermesvm_a)
+endif()
 # add_executable(InspectorTest src/InspectorTest.cc)
 # target_link_libraries(InspectorTest gtest ScriptX)
+
+add_executable(HermesTests)
+target_sources(HermesTests PRIVATE
+    /Users/andy/Desktop/browsers/ScriptX/hermes_main.cc
+)
+target_link_libraries(HermesTests PUBLIC ScriptX)
+target_sources(HermesTests PUBLIC "${HERMES_SRC_DIR}/API/jsi/jsi/jsilib-posix.cpp")
+
+target_include_directories(HermesTests PUBLIC /Users/andy/Desktop/browsers/ScriptX/test)

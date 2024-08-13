@@ -859,8 +859,6 @@ class InstanceDefineBuilder : public InstanceDefineBuilderState {
         const auto setter = [setterCallback, prop] (T* w, const script::Local<script::Value>& value)
         {
             using FunctionTraits = script::internal::FuncTrait<S>;
-            using Return = typename FunctionTraits::ReturnType;
-
             using ArgTraits = script::internal::traits::TupleTrait<typename FunctionTraits::Arguments>;
             using ValueArg = std::decay_t<typename ArgTraits::template Arg<2>>; // Get the setter functions's expected type
 

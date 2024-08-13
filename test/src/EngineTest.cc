@@ -26,7 +26,7 @@ TEST_F(EngineTest, Misc) {
   engine->gc();
 
   auto size = engine->getHeapSize();
-#if defined(SCRIPTX_BACKEND_V8) || defined(SCRIPTX_BACKEND_LUA)
+#if defined(SCRIPTX_BACKEND_HERMES) || defined(SCRIPTX_BACKEND_V8) || defined(SCRIPTX_BACKEND_LUA)
   EXPECT_GT(size, 0);
 #endif
 

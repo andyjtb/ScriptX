@@ -114,6 +114,10 @@ class ScriptEngine {
    */
   virtual Local<Value> eval(const Local<String>& script) = 0;
 
+  virtual Local<Value> evalInPlace(const std::string& script) = 0;
+  virtual Local<Value> evalInPlace(const std::string& script, const std::string& sourceFile) = 0;
+  virtual Local<Value> evalInPlace(const char* data, size_t size, const std::string& sourceFile) = 0;
+
   template <typename T, typename R = std::string, StringLikeConcept(T), StringLikeConcept(R)>
   Local<Value> eval(T&& scriptStringLike, R&& sourceFileStringLike = {}) {
     return eval(String::newString(std::forward<T>(scriptStringLike)),

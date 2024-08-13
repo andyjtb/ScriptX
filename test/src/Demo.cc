@@ -139,7 +139,7 @@ std::string_view getScriptBaseLibrary() {
 
 var API = {};
 API.createImage = function(src) {
-  let img = new Image();
+  let img = new Image({});
   img.src = src;
   return img;
 };

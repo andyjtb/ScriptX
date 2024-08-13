@@ -30,6 +30,9 @@ EngineScopeImpl::EngineScopeImpl(QjsEngine &current, QjsEngine *prev)
 }
 
 EngineScopeImpl::~EngineScopeImpl() {
+  JSContext* ctx = nullptr;
+  while (JS_ExecutePendingJob(current_->runtime_, &ctx) > 0) {
+  }
   current_->runtimeLock_.unlock();
   if (previous_) {
     previous_->runtimeLock_.lock();

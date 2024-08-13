@@ -159,6 +159,11 @@ class JscEngine : public ::script::ScriptEngine {
 
   Local<Value> eval(const Local<String>& script, const Local<String>& sourceFile) override;
   Local<Value> eval(const Local<String>& script) override;
+
+  Local<Value> evalInPlace(const std::string& script) override;
+  Local<Value> evalInPlace(const std::string& script, const std::string& sourceFile) override;
+  Local<Value> evalInPlace(const char* script, size_t size, const std::string& sourceFile) override;
+
   using ScriptEngine::eval;
 
   std::shared_ptr<utils::MessageQueue> messageQueue() override;

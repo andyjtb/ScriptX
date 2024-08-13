@@ -18,6 +18,8 @@
 #include "QjsEngine.h"
 #include <ScriptX/ScriptX.h>
 
+#include <quickjs-libc.h>
+
 namespace script::qjs_backend {
 
 JSClassID QjsEngine::kPointerClassId = 0;
@@ -97,10 +99,16 @@ QjsEngine::QjsEngine(std::shared_ptr<utils::MessageQueue> queue, const QjsFactor
 }
 
 void QjsEngine::initEngineResource() {
-  std::call_once(kGlobalQjsClass, []() {
+  std::call_once(kGlobalQjsClass, [this]() {
+#if QUICKJS_NG
+    JS_NewClassID(runtime_, &kPointerClassId);
+    JS_NewClassID(runtime_, &kInstanceClassId);
+    JS_NewClassID(runtime_, &kFunctionDataClassId);
+#else
     JS_NewClassID(&kPointerClassId);
     JS_NewClassID(&kInstanceClassId);
     JS_NewClassID(&kFunctionDataClassId);
+#endif
   });
 
   JSClassDef pointer{};
@@ -262,6 +270,33 @@ Local<Value> QjsEngine::eval(const Local<String>& script, const Local<Value>& so
     ret = JS_Eval(context_, sh.c_str(), sh.length(), source.c_str(), JS_EVAL_TYPE_GLOBAL);
   } else {
     ret = JS_Eval(context_, sh.c_str(), sh.length(), "<unknown>", JS_EVAL_TYPE_GLOBAL);
+  }
+  qjs_backend::checkException(ret);
+
+  JSContext* ctx;
+  while (JS_ExecutePendingJob(runtime_, &ctx) > 0) {
+  }
+  //scheduleTick();
+
+  return Local<Value>(ret);
+}
+
+script::Local<script::Value> QjsEngine::evalInPlace(const std::string& script) {
+  return evalInPlace(script, {});
+}
+
+script::Local<script::Value> QjsEngine::evalInPlace(const std::string& script, const std::string& sourceFile) {
+  return evalInPlace(script.c_str(), script.length(), sourceFile);
+}
+
+script::Local<script::Value> QjsEngine::evalInPlace(const char* script, size_t size, const std::string& sourceFile) {
+  Tracer trace(this, "QjsEngine::evalInPlace");
+  JSValue ret = JS_UNDEFINED;
+
+  if (! sourceFile.empty() && ! sourceFile.ends_with(".js")) {
+      js_std_eval_binary(context_, reinterpret_cast<const uint8_t*>(script), size, JS_EVAL_TYPE_GLOBAL);
+  } else {
+    ret = JS_Eval(context_, script, size, sourceFile.empty() ? "<unknown>" : sourceFile.c_str(), JS_EVAL_TYPE_GLOBAL);
   }
   qjs_backend::checkException(ret);
 

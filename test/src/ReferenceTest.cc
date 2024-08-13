@@ -206,6 +206,7 @@ TEST_F(ReferenceTest, WeakGlobal) {
     auto hello = String::newString(u8"Hello");
     global = Global<String>(hello);
     weak = Weak<String>(global);
+    EXPECT_FALSE(global.isEmpty());
     EXPECT_FALSE(weak.isEmpty());
 
     global.reset();
@@ -220,7 +221,7 @@ TEST_F(ReferenceTest, WeakGlobal) {
   }
 }
 
-TEST_F(ReferenceTest, WeakNotClrear) {
+TEST_F(ReferenceTest, WeakNotClear) {
   Weak<String> weak;
   {
     EngineScope engineScope(engine);
