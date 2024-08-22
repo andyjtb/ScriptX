@@ -95,6 +95,10 @@ Local<Boolean> Boolean::newBoolean(bool value) {
   return Local<Boolean>(JSValueMakeBoolean(jsc_backend::currentEngineContextChecked(), value));
 }
 
+Local<Null> Null::newNull() {
+  return Local<Null>(JSValueMakeNull(jsc_backend::currentEngineContextChecked()));
+}
+
 namespace {
 std::once_flag newFunctionClazzObject;
 JSClassRef newFunctionClazzObjectClass;

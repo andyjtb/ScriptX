@@ -69,11 +69,19 @@ StringLocalRef::SharedStringRef StringLocalRef::getSharedStringRef(JSContextRef 
   return rawStringRef_;
 }
 
-bool isNullOrUndefined(JSValueRef value) {
-  if (value == nullptr) return true;
+JSType getType(JSValueRef value) {
   auto ctx = jsc_backend::currentEngineContextChecked();
-  auto type = JSValueGetType(ctx, value);
-  return type == JSType::kJSTypeNull || type == JSType::kJSTypeUndefined;
+  return JSValueGetType(ctx, value);
+}
+
+bool isUndefined(JSValueRef value) {
+  if (value == nullptr) return true;
+  return getType(value) == JSType::kJSTypeUndefined;
+}
+
+bool isNull(JSValueRef value) {
+  if (value == nullptr) return true;
+  return getType(value) == JSType::kJSTypeNull;
 }
 
 JSObjectRef valueToObj(JSGlobalContextRef context, JSValueRef value) {
@@ -86,7 +94,7 @@ JSObjectRef valueToObj(JSGlobalContextRef context, JSValueRef value) {
 void valueConstructorCheck(JSValueRef value) {
   SCRIPTX_UNUSED(value);
 #ifndef NDEBUG
-  if (jsc_backend::isNullOrUndefined(value)) throw Exception("null reference");
+  if (jsc_backend::isUndefined(value)) throw Exception("null reference");
 #endif
 }
 
@@ -130,6 +138,10 @@ void valueConstructorCheck(const StringLocalRef&) {}
   Local<Value> Local<ValueType>::asValue() const { return Local<Value>(val_); }
 
 REF_IMPL_BASIC_FUNC(Value)
+
+REF_IMPL_BASIC_FUNC(Null)
+REF_IMPL_TO_VALUE(Null)
+REF_IMPL_BASIC_NOT_VALUE(Null)
 
 REF_IMPL_BASIC_FUNC(Object)
 REF_IMPL_BASIC_NOT_VALUE(Object)
@@ -176,7 +188,9 @@ Local<Value>::Local() noexcept : val_() {}
 
 Local<Value>::Local(InternalLocalRef v8Local) : val_(v8Local) {}
 
-bool Local<Value>::isNull() const { return jsc_backend::isNullOrUndefined(val_); }
+bool Local<Value>::isNull() const { return jsc_backend::isNull(val_); }
+
+bool Local<Value>::isUndefined() const { return jsc_backend::isUndefined(val_); }
 
 void Local<Value>::reset() { val_ = nullptr; }
 

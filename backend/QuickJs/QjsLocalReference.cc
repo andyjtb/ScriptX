@@ -59,6 +59,10 @@ namespace script {
 
 REF_IMPL_BASIC_FUNC(Value)
 
+REF_IMPL_BASIC_FUNC(Null)
+REF_IMPL_TO_VALUE(Null)
+REF_IMPL_BASIC_NOT_VALUE(Null)
+
 REF_IMPL_BASIC_FUNC(Object)
 REF_IMPL_BASIC_NOT_VALUE(Object)
 REF_IMPL_BASIC_EQUALS(Object)
@@ -106,7 +110,11 @@ Local<Value>::Local() noexcept : val_(JS_UNDEFINED) {}
 Local<Value>::Local(InternalLocalRef local) : val_(local) {}
 
 bool Local<Value>::isNull() const {
-  return JS_IsNull(val_) || JS_IsUninitialized(val_) || JS_IsUndefined(val_);
+  return JS_IsNull(val_);
+}
+
+bool Local<Value>::isUndefined() const {
+  return JS_IsUninitialized(val_) || JS_IsUndefined(val_);
 }
 
 void Local<Value>::reset() { *this = Local<Value>(); }
@@ -114,6 +122,8 @@ void Local<Value>::reset() { *this = Local<Value>(); }
 ValueKind Local<Value>::getKind() const {
   if (isNull()) {
     return ValueKind::kNull;
+  } else if (isUndefined()) {
+    return ValueKind::kUndefined;
   } else if (isString()) {
     return ValueKind::kString;
   } else if (isNumber()) {

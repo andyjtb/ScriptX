@@ -95,6 +95,10 @@ Local<Boolean> Boolean::newBoolean(bool value) {
   return qjs_interop::makeLocal<Boolean>(JS_NewBool(qjs_backend::currentContext(), value));
 }
 
+Local<Null> Null::newNull() {
+  return qjs_interop::makeLocal<Null>(JS_NULL);
+}
+
 Local<Function> Function::newFunction(script::FunctionCallback callback) {
   auto ptr = std::make_unique<script::FunctionCallback>(std::move(callback));
 

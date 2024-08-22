@@ -29,6 +29,7 @@ namespace script {
 // values
 enum class ValueKind {
   kNull = 0,
+  kUndefined,
   kObject,
   kString,
   kNumber,
@@ -51,6 +52,8 @@ inline const char* valueKindName(ValueKind kind) noexcept {
   switch (kind) {
     case ValueKind::kNull:
       return "Null";
+    case ValueKind::kUndefined:
+      return "Undefined";
     case ValueKind::kObject:
       return "Object";
     case ValueKind::kString:
@@ -77,6 +80,11 @@ inline std::ostream& operator<<(std::ostream& o, ValueKind k) {
 }
 
 class Value {};
+
+class Null : public Value {
+ public:
+  static Local<Null> newNull();
+};
 
 class Object : public Value {
  public:
