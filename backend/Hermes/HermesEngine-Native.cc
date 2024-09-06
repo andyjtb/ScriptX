@@ -246,6 +246,8 @@ void HermesEngine::defineInstanceProperties(const internal::ClassDefineState* cl
   const auto res =
       defineProperties.call(getRt(), *prototype.val_.valuePtr, *allProperties.val_.valuePtr);
   assert(res.isObject());
+
+  hermes_interop::toHermes(prototype)->asObject(getRt()).setToStringTag(getRt(), jsi::String::createFromUtf8 (getRt(), classDefine->className));
 }
 
 void HermesEngine::registerStaticDefine(const internal::StaticDefine& staticDefine,
