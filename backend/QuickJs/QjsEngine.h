@@ -145,7 +145,7 @@ class QjsEngine : public ScriptEngine {
   /**
    * similar to js_std_loop
    */
-  void scheduleTick();
+  void triggerTick();
 
   void extendLifeTimeToNextLoop(JSValue value);
 

@@ -201,9 +201,10 @@ void QjsEngine::destroy() noexcept {
   delete this;
 }
 
-void QjsEngine::scheduleTick() {
+void QjsEngine::triggerTick() {
   bool no = false;
-  if (tickScheduled_.compare_exchange_strong(no, true)) {
+  if (!isDestroying() && JS_IsJobPending(runtime_) &&
+      tickScheduled_.compare_exchange_strong(no, true)) {
     utils::Message tick(
         [](auto& m) {
           auto eng = static_cast<QjsEngine*>(m.ptr0);
@@ -213,9 +214,7 @@ void QjsEngine::scheduleTick() {
           }
           eng->tickScheduled_ = false;
         },
-        [](auto& m) {
-
-        });
+        nullptr);
     tick.ptr0 = this;
     tick.tag = this;
     queue_->postMessage(tick);
@@ -276,7 +275,7 @@ Local<Value> QjsEngine::eval(const Local<String>& script, const Local<Value>& so
   JSContext* ctx;
   while (JS_ExecutePendingJob(runtime_, &ctx) > 0) {
   }
-  // scheduleTick();
+
 
   return Local<Value>(ret);
 }
@@ -331,7 +330,7 @@ script::Local<script::Value> QjsEngine::evalInPlace(const char* script, size_t s
   }
   qjs_backend::checkException(ret);
 
-  scheduleTick();
+  triggerTick();
 
   return Local<Value>(ret);
 }
