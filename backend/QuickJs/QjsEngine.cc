@@ -276,7 +276,7 @@ Local<Value> QjsEngine::eval(const Local<String>& script, const Local<Value>& so
   JSContext* ctx;
   while (JS_ExecutePendingJob(runtime_, &ctx) > 0) {
   }
-  //scheduleTick();
+  // scheduleTick();
 
   return Local<Value>(ret);
 }
@@ -285,18 +285,49 @@ script::Local<script::Value> QjsEngine::evalInPlace(const std::string& script) {
   return evalInPlace(script, {});
 }
 
-script::Local<script::Value> QjsEngine::evalInPlace(const std::string& script, const std::string& sourceFile) {
+script::Local<script::Value> QjsEngine::evalInPlace(const std::string& script,
+                                                    const std::string& sourceFile) {
   return evalInPlace(script.c_str(), script.length(), sourceFile);
 }
 
-script::Local<script::Value> QjsEngine::evalInPlace(const char* script, size_t size, const std::string& sourceFile) {
+script::Local<script::Value> QjsEngine::evalInPlace(const char* script, size_t size,
+                                                    const std::string& sourceFile) {
   Tracer trace(this, "QjsEngine::evalInPlace");
   JSValue ret = JS_UNDEFINED;
 
-  if (! sourceFile.empty() && ! sourceFile.ends_with(".js")) {
-      js_std_eval_binary(context_, reinterpret_cast<const uint8_t*>(script), size, JS_EVAL_TYPE_GLOBAL);
+  if (!sourceFile.empty() && !sourceFile.ends_with(".js")) {
+    JSValue obj;
+    constexpr auto load_only = JS_EVAL_TYPE_GLOBAL;
+    obj = JS_ReadObject(context_, (const uint8_t*)script, size, JS_READ_OBJ_BYTECODE);
+    if (JS_IsException(obj)) {
+      js_std_dump_error(context_);
+      return {};
+    }
+    if (load_only) {
+      if (JS_VALUE_GET_TAG(obj) == JS_TAG_MODULE) {
+        js_module_set_import_meta(context_, obj, false, true);
+      }
+    } else {
+      if (JS_VALUE_GET_TAG(obj) == JS_TAG_MODULE) {
+        if (JS_ResolveModule(context_, obj) < 0) {
+          JS_FreeValue(context_, obj);
+          js_std_dump_error(context_);
+          return {};
+        }
+        js_module_set_import_meta(context_, obj, false, true);
+        ret = JS_EvalFunction(context_, obj);
+        ret = js_std_await(context_, ret);
+      } else {
+        ret = JS_EvalFunction(context_, obj);
+      }
+      if (JS_IsException(ret)) {
+        js_std_dump_error(context_);
+        return {};
+      }
+    }
   } else {
-    ret = JS_Eval(context_, script, size, sourceFile.empty() ? "<unknown>" : sourceFile.c_str(), JS_EVAL_TYPE_GLOBAL);
+    ret = JS_Eval(context_, script, size, sourceFile.empty() ? "<unknown>" : sourceFile.c_str(),
+                  JS_EVAL_TYPE_GLOBAL);
   }
   qjs_backend::checkException(ret);
 
