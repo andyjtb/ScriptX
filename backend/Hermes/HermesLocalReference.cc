@@ -384,7 +384,7 @@ ByteBuffer::Type Local<ByteBuffer>::getType() const {
       case hermes_backend::TypedArrayKind::Uint32Array:
         return ByteBuffer::Type::kUint32;
       case hermes_backend::TypedArrayKind::Float32Array:
-        return ByteBuffer::Type::KFloat32;
+        return ByteBuffer::Type::kFloat32;
       case hermes_backend::TypedArrayKind::Float64Array:
         return ByteBuffer::Type::kFloat64;
       case hermes_backend::TypedArrayKind::DataView:
@@ -392,7 +392,7 @@ ByteBuffer::Type Local<ByteBuffer>::getType() const {
     }
   }
 
-  return ByteBuffer::Type::KFloat32;
+  return ByteBuffer::Type::kFloat32;
 }
 
 bool Local<ByteBuffer>::isShared() const { return getRawBytesShared() != nullptr; }

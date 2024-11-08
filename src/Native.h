@@ -188,6 +188,8 @@ class ScriptClass {
 
   ScriptEngine* getScriptEngine() const;
 
+  bool isScriptObjectNull() const;
+
   template <typename T>
   T* getScriptEngineAs() const;
 
