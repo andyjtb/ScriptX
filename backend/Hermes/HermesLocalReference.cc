@@ -25,7 +25,7 @@ namespace script {
 
 void valueConstructorCheck(const facebook::jsi::Value& value) {
 #ifndef NDEBUG
-  if (value.isUndefined()) throw Exception("null reference");
+  if (value.isNull() || value.isUndefined()) throw Exception("null reference");
 #endif
 }
 
@@ -67,10 +67,6 @@ ValueHolder::ValueHolder(const facebook::jsi::Value& value)
   Local<Value> Local<ValueType>::asValue() const { return Local<Value>(val_); }
 
 REF_IMPL_BASIC_FUNC(Value)
-
-REF_IMPL_BASIC_FUNC(Null)
-REF_IMPL_TO_VALUE(Null)
-REF_IMPL_BASIC_NOT_VALUE(Null)
 
 REF_IMPL_BASIC_FUNC(Object)
 REF_IMPL_BASIC_NOT_VALUE(Object)
@@ -120,12 +116,8 @@ Local<Value>::Local(InternalLocalRef hermesLocal) : val_(hermesLocal) {}
 
 bool Local<Value>::isNull() const {
   if (val_.valuePtr == nullptr) return true;
-  return hermes_interop::isType(*this, &facebook::jsi::Value::isNull);
-}
-
-bool Local<Value>::isUndefined() const {
-  if (val_.valuePtr == nullptr) return true;
-  return hermes_interop::isType(*this, &facebook::jsi::Value::isUndefined);
+  return hermes_interop::isType(*this, &facebook::jsi::Value::isNull) ||
+         hermes_interop::isType(*this, &facebook::jsi::Value::isUndefined);
 }
 
 void Local<Value>::reset() {
@@ -135,8 +127,6 @@ void Local<Value>::reset() {
 ValueKind Local<Value>::getKind() const {
   if (isNull()) {
     return ValueKind::kNull;
-  } else if (isUndefined()) {
-    return ValueKind::kUndefined;
   } else if (isString()) {
     return ValueKind::kString;
   } else if (isNumber()) {

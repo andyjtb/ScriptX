@@ -278,8 +278,6 @@ class Local<Value> {
 
   bool isNull() const;
 
-  bool isUndefined() const;
-
   bool isObject() const;
 
   bool isString() const;
@@ -433,14 +431,6 @@ class Local<Number> {
   double toDouble() const;
 
   SPECIALIZE_NON_VALUE(Number)
-};
-
-template <>
-class Local<Null> {
-  SPECIALIZE_LOCAL(Null)
-
- public:
-  SPECIALIZE_NON_VALUE(Null)
 };
 
 template <>

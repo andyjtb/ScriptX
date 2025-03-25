@@ -85,10 +85,6 @@ Local<Boolean> Boolean::newBoolean(bool value) {
   return hermes_interop::makeLocal<Boolean>(jsi::Value(*hermes_backend::currentRuntime(), value));
 }
 
-Local<Null> Null::newNull() {
-  return hermes_interop::makeLocal<Null>(jsi::Value(nullptr));
-}
-
 namespace {
 struct PrivateData {
   PrivateData(script::FunctionCallback&& cb) : callback_(std::move(cb)) {}
