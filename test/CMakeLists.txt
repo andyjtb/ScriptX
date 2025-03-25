@@ -1,10 +1,12 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.23)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+if ("${PROJECT_NAME}" STREQUAL "")
+    set(CMAKE_CXX_STANDARD 20)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-file(STRINGS ${CMAKE_CURRENT_LIST_DIR}/../VERSION SCRIPTX_VERSION)
-project(ScriptXUnitTests VERSION ${SCRIPTX_VERSION} LANGUAGES CXX C)
+    file(STRINGS ${CMAKE_CURRENT_LIST_DIR}/../VERSION SCRIPTX_VERSION)
+    project(ScriptXUnitTests VERSION ${SCRIPTX_VERSION} LANGUAGES CXX C)
+endif()
 
 option(DEVOPS_ENABLE_COVERAGE "enable code coverage" OFF)
 enable_testing()
@@ -84,7 +86,9 @@ set(SCRIPTX_BACKEND Hermes CACHE STRING "" FORCE)
 # set(SCRIPTX_FEATURE_INSPECTOR ON CACHE BOOL "" FORCE)
 
 #   1.2 include ScriptX's CMake file
-include(${SCRIPTX_DIR}/CMakeLists.txt)
+if (NOT TARGET ScriptX)
+    include(${SCRIPTX_DIR}/CMakeLists.txt)
+endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND TEST_FLAG_ENABLE_CLANG_TIDY)
 
@@ -105,7 +109,7 @@ target_compile_definitions(ScriptX PUBLIC ${DEVOPS_LIBS_MARCO})
 # if you want to close rtti feature for ScriptX and your project
 #target_compile_options(ScriptX PRIVATE -fno-rtti)
 #target_compile_options(UnitTests PRIVATE -fno-rtti)
-target_link_libraries(UnitTests gtest ScriptX)
+target_link_libraries(UnitTests ScriptX_gtest ScriptX)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     # using clang or gcc
@@ -154,50 +158,10 @@ add_test(
 )
 
 if (${SCRIPTX_BACKEND} STREQUAL Hermes)
-    if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-        set(HERMES_SRC_DIR "/Users/andy/Desktop/browsers/ScriptX/test/cmake-build-debug/ScriptXTestLibs/hermes")
-        set(HERMES_BUILD_DIR "/Users/andy/Desktop/browsers/ScriptX/test/cmake-build-debug/Hermes")
-    elseif(${CMAKE_BUILD_TYPE} STREQUAL "Release")
-        set(HERMES_SRC_DIR "/Users/andy/Desktop/browsers/ScriptX/test/cmake-build-release/ScriptXTestLibs/hermes")
-        set(HERMES_BUILD_DIR "/Users/andy/Desktop/browsers/ScriptX/test/cmake-build-release/Hermes")
+    if (NOT TARGET ScriptX)
+        target_link_libraries(ScriptX hermesvm_a)
     endif()
-    if (NOT HERMES_SRC_DIR)
-        message(FATAL_ERROR "Please specify HERMES_SRC_DIR")
-    endif ()
-    # Validate HERMES_SRC_DIR by checking for API/jsi/jsi/jsi.h
-    if (NOT EXISTS "${HERMES_SRC_DIR}/API/jsi/jsi/jsi.h")
-        message(FATAL_ERROR "HERMES_SRC_DIR does not contain API/jsi/jsi/jsi.h")
-    endif ()
-
-    if (NOT HERMES_BUILD_DIR)
-        message(FATAL_ERROR "Please specify HERMES_BUILD_DIR")
-    endif ()
-    # Validate HERMES_BUILD_DIR by checking for bin/hermes with the platform-specific extension
-#    if (NOT EXISTS "${HERMES_BUILD_DIR}/bin/hermes${CMAKE_EXECUTABLE_SUFFIX}")
-#        message(FATAL_ERROR "HERMES_BUILD_DIR does not contain bin/hermes${CMAKE_EXECUTABLE_SUFFIX}")
-#    endif ()
-
-    # Add Hermes include directories
-    include_directories("${HERMES_SRC_DIR}/API")
-    include_directories("${HERMES_SRC_DIR}/API/jsi")
-    include_directories("${HERMES_SRC_DIR}/public")
-
-    # Add Hermes library directories
-    link_directories("${HERMES_BUILD_DIR}/API/hermes")
-    link_directories("${HERMES_BUILD_DIR}/jsi")
-
-    #hermesvm_a
-    #target_link_libraries(ScriptX libhermes)
-    target_link_libraries(ScriptX hermesvm_a)
 endif()
+
 # add_executable(InspectorTest src/InspectorTest.cc)
 # target_link_libraries(InspectorTest gtest ScriptX)
-
-add_executable(HermesTests)
-target_sources(HermesTests PRIVATE
-    /Users/andy/Desktop/browsers/ScriptX/hermes_main.cc
-)
-target_link_libraries(HermesTests PUBLIC ScriptX)
-target_sources(HermesTests PUBLIC "${HERMES_SRC_DIR}/API/jsi/jsi/jsilib-posix.cpp")
-
-target_include_directories(HermesTests PUBLIC /Users/andy/Desktop/browsers/ScriptX/test)

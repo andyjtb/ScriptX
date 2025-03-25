@@ -26,13 +26,13 @@ if (NOT EXISTS "${SCRIPTX_TEST_LIBS}")
     endif ()
 
     execute_process(COMMAND
-        git clone git@github.com:facebook/hermes.git
+        git clone git@github.com:andyjtb/hermes.git
         RESULT_VARIABLE result
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/ScriptXTestLibs
     )
 
     execute_process(COMMAND
-        git checkout --force origin/facebook/static_h
+        git checkout --force origin/static_h_scriptx
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/ScriptXTestLibs/hermes
         )
 elseif (("${SCRIPTX_TEST_FORCE_UPDATE_DEPS}" STREQUAL ON) OR ("$ENV{SCRIPTX_TEST_FORCE_UPDATE_DEPS}" STREQUAL ON))

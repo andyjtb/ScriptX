@@ -169,6 +169,9 @@ elseif (${SCRIPTX_BACKEND} STREQUAL QuickJs)
 elseif (${SCRIPTX_BACKEND} STREQUAL Hermes)
     set(HERMES_ENABLE_TEST_SUITE OFF)
     #set(HERMES_STATIC_LINK ON)
-    add_subdirectory("${SCRIPTX_TEST_LIBS}/hermes" Hermes)
+
+    if (NOT TARGET hermesvm_a)
+        add_subdirectory("${SCRIPTX_TEST_LIBS}/hermes" Hermes)
+    endif()
 endif ()
 

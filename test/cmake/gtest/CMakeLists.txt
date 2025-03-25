@@ -39,9 +39,18 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
 # Add googletest directly to our build. This defines
 # the gtest and gtest_main targets.
-add_subdirectory(${SCRIPTX_TEST_GOOGLE_TEST}
-        ${CMAKE_CURRENT_BINARY_DIR}/googletest-build
-        EXCLUDE_FROM_ALL)
+#add_subdirectory(${SCRIPTX_TEST_GOOGLE_TEST}
+#        ${CMAKE_CURRENT_BINARY_DIR}/googletest-build
+#        EXCLUDE_FROM_ALL)
+set(gtest_dir ${SCRIPTX_TEST_GOOGLE_TEST}/googletest)
+add_library(ScriptX_gtest
+    ${gtest_dir}/src/gtest-all.cc
+)
+
+target_include_directories(ScriptX_gtest PUBLIC
+    ${gtest_dir}/include
+    ${gtest_dir}
+)
 
 # The gtest/gtest_main targets carry header search path
 # dependencies automatically when using CMake 2.8.11 or
