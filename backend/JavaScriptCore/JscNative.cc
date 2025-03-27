@@ -85,4 +85,8 @@ ScriptClass::~ScriptClass() {
   internalState_.weakRef_.reset(engine);
 }
 
+bool ScriptClass::isScriptObjectNull() const {
+  return internalState_.weakRef_.isEmpty();
+}
+
 }  // namespace script
