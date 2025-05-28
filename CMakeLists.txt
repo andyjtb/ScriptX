@@ -203,6 +203,6 @@ if (WIN32)
     set_property(TARGET ScriptX PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
-if(${SCRIPTX_UNIT_TEST})
+if(${SCRIPTX_UNIT_TEST} AND NOT ${CMAKE_GENERATOR} STREQUAL "Xcode")
     add_subdirectory(test)
 endif()
