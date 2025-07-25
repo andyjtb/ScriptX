@@ -67,7 +67,11 @@ Local<Array> ScriptClass::getInternalStore() const {
     auto obj = internalState_.weakRef_;
     auto store = JS_GetProperty(context, obj, symbol);
     qjs_backend::checkException(store);
+#if SCRIPTX_BACKEND_QUICKJS_NG
+    if (!JS_IsArray(store)) {
+#else
     if (!JS_IsArray(context, store)) {
+#endif
       JS_FreeValue(context, store);
       store = JS_NewArray(context);
       qjs_backend::checkException(store);
@@ -101,5 +105,9 @@ void ScriptClass::performConstructFromCpp(internal::TypeIndex typeIndex,
 ScriptEngine* ScriptClass::getScriptEngine() const { return internalState_.engine; }
 
 ScriptClass::~ScriptClass() = default;
+
+bool ScriptClass::isScriptObjectNull() const {
+  return JS_IsNull(internalState_.weakRef_);
+}
 
 }  // namespace script

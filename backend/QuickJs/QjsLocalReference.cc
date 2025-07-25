@@ -126,7 +126,11 @@ ValueKind Local<Value>::getKind() const {
 
   if (JS_IsFunction(context, val_)) {
     return ValueKind::kFunction;
+#if SCRIPTX_BACKEND_QUICKJS_NG
+  } else if (JS_IsArray(val_)) {
+#else
   } else if (JS_IsArray(context, val_)) {
+#endif
     return ValueKind::kArray;
   } else if (isByteBuffer()) {
     return ValueKind::kByteBuffer;
@@ -145,7 +149,11 @@ bool Local<Value>::isBoolean() const { return JS_IsBool(val_); }
 
 bool Local<Value>::isFunction() const { return JS_IsFunction(qjs_backend::currentContext(), val_); }
 
+#if SCRIPTX_BACKEND_QUICKJS_NG
+bool Local<Value>::isArray() const { return JS_IsArray(val_); }
+#else
 bool Local<Value>::isArray() const { return JS_IsArray(qjs_backend::currentContext(), val_); }
+#endif
 
 bool Local<Value>::isByteBuffer() const {
   if (!isObject()) return false;
