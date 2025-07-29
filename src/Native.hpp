@@ -839,6 +839,36 @@ class InstanceDefineBuilder : public InstanceDefineBuilderState {
     return thiz();
   }
 
+  template<typename Lambda>
+  ClassDefineBuilder<T>& insPropLambda (std::string name, Lambda getFunc, bool nothrow = kBindingNoThrowDefaultValue)
+  {
+    insProperties_.push_back(typename InstanceDefine::PropertyDefine{
+      std::move(name),
+      bindInstanceGet<T>(getFunc, nothrow),
+      nullptr,
+    {}});
+
+    return thiz();
+  }
+
+  template<typename FunctionPointer>
+  ClassDefineBuilder<T>& insFunc (const std::string& name, FunctionPointer member)
+  {
+      using FunctionTraits = script::internal::FuncTrait<FunctionPointer>;
+      using ArgTraits = script::internal::traits::TupleTrait<typename FunctionTraits::Arguments>;
+
+      using Helper = ConvertingFuncCallHelper<
+          std::pair<typename FunctionTraits::ReturnType, typename ArgTraits::Tail>
+      >;
+
+      this->instanceFunction (name, [member](T* w, const script::Arguments& args)
+      {
+          return Helper::callInstanceFunc (member, w, args, false, false);
+      });
+
+      return thiz();
+  }
+
   template <typename Container, typename G, typename S = InstanceSetterCallback>
   ClassDefineBuilder<T>& mapInstanceProperties(const Container& names, G&& getter, S&& setterCallback = nullptr,
            bool nothrow = internal::kBindingNoThrowDefaultValue) {
