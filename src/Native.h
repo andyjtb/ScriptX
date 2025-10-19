@@ -523,20 +523,44 @@ class ClassDefineState {
    */
   const internal::InstanceDefine instanceDefine;
 
+  /**
+   * parent class for prototype chain inheritance
+   */
+  const internal::ClassDefineState* parentClassDefine;
+
   ClassDefineState(std::string&& className, std::string&& nameSpace,
-                   internal::StaticDefine&& staticDefine, internal::InstanceDefine&& instanceDefine)
+                   internal::StaticDefine&& staticDefine, internal::InstanceDefine&& instanceDefine,
+                   const internal::ClassDefineState* parent = nullptr)
       : className(std::move(className)),
         nameSpace(std::move(nameSpace)),
         staticDefine(std::move(staticDefine)),
-        instanceDefine(std::move(instanceDefine)) {}
+        instanceDefine(std::move(instanceDefine)),
+        parentClassDefine(parent) {}
 
   void validateClassDefine(bool isBaseOfScriptClass) const;
 
   bool hasInstanceDefine() const { return static_cast<bool>(instanceDefine.constructor); }
 
+  /**
+   * Get the parent class for prototype chain inheritance
+   */
+  const internal::ClassDefineState* getParent() const { return parentClassDefine; }
+
 #ifdef __cpp_rtti
   void visit(script::ClassDefineVisitor& visitor) const;
 #endif
+
+  /**
+   * Check if this class is a child (direct or indirect) of the given class
+   */
+  bool isChildOf(const internal::ClassDefineState* possibleParent) const {
+    const auto* current = parentClassDefine;
+      while (current != nullptr) {
+        if (current == possibleParent) return true;
+        current = current->parentClassDefine;
+      }
+    return false;
+  }
 
   SCRIPTX_CLASS_DEFINE_FRIENDS
 };
@@ -565,9 +589,10 @@ class ClassDefine : private internal::ClassDefineState {
 
  private:
   ClassDefine(std::string&& className, std::string&& nameSpace,
-              internal::StaticDefine&& staticDefine, internal::InstanceDefine&& instanceDefine)
+              internal::StaticDefine&& staticDefine, internal::InstanceDefine&& instanceDefine,
+              const internal::ClassDefineState* parent = nullptr)
       : internal::ClassDefineState(std::move(className), std::move(nameSpace),
-                                   std::move(staticDefine), std::move(instanceDefine)) {
+                                   std::move(staticDefine), std::move(instanceDefine), parent) {
     validateClassDefine(std::is_base_of_v<ScriptClass, T>);
   }
 

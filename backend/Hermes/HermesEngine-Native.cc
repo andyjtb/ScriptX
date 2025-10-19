@@ -178,6 +178,23 @@ Local<Object> HermesEngine::defineInstancePrototype(const internal::ClassDefineS
 
   if (!classDefine->instanceDefine.properties.empty()) defineInstanceProperties(classDefine, proto);
 
+  if (classDefine->getParent() != nullptr) {
+    auto parentRegistry = classRegistry_.find(classDefine->getParent());
+    if (parentRegistry != classRegistry_.end()) {
+      auto& rt = getRt();
+      auto Object = rt.global().getPropertyAsObject(rt, "Object");
+      auto setPrototypeOf = Object.getPropertyAsFunction(rt, "setPrototypeOf");
+
+      setPrototypeOf.call(rt,
+          *proto.val_.valuePtr,
+          *parentRegistry->second.prototype.val_.valuePtr);
+    } else {
+      throw Exception("Parent class '" + classDefine->getParent()->className +
+                     "' must be registered before child class '" +
+                     classDefine->className + "'");
+    }
+  }
+
   return proto;
 }
 
@@ -414,7 +431,7 @@ Local<Object> HermesEngine::performNewNativeClass(internal::TypeIndex typeIndex,
 bool HermesEngine::performIsInstanceOf(const Local<script::Value>& value,
                                        const internal::ClassDefineState* classDefine) {
   if (!value.isObject()) return false;
-  auto it = classRegistry_.find(const_cast<internal::ClassDefineState*>(classDefine));
+  auto it = classRegistry_.find(classDefine);
 
   if (it != classRegistry_.end() && !it->second.constructor.isEmpty()) {
     auto& rt = getRt();
@@ -426,8 +443,14 @@ bool HermesEngine::performIsInstanceOf(const Local<script::Value>& value,
 
     if (obj.hasNativeState(rt)) {
       void* privateData = obj.getNativeState(rt).get();
-      return static_cast<SharedScriptClassHolder*>(privateData)->sc->internalState_.classDefine ==
-             classDefine;
+      auto* objectClassDefine = static_cast<const internal::ClassDefineState*>(
+          static_cast<SharedScriptClassHolder*>(privateData)->sc->internalState_.classDefine);
+
+      if (objectClassDefine == classDefine)
+        return true;
+
+      if (objectClassDefine->isChildOf(classDefine))
+        return true;
     }
   }
 

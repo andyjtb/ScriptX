@@ -453,11 +453,8 @@ Local<Object> QjsEngine::newPrototype(const internal::ClassDefineState* define) 
 
     auto fun = newRawFunction(this, const_cast<FuncDef*>(&f), definePtr,
                               [](const Arguments& args, void* data1, void* data2, bool) {
-                                auto ptr = static_cast<InstanceClassOpaque*>(JS_GetOpaque(
-                                    qjs_interop::peekLocal(args.thiz()), kInstanceClassId));
-                                if (ptr == nullptr || ptr->classDefine != data2) {
-                                  throw Exception(u8"call function on wrong receiver");
-                                }
+                                auto* ptr = getAndCheckInstance(args, data2);
+
                                 auto f = static_cast<FuncDef*>(data1);
                                 Tracer tracer(args.engine(), f->traceName);
                                 return (f->callback)(ptr->scriptClassPolymorphicPointer, args);
@@ -474,11 +471,8 @@ Local<Object> QjsEngine::newPrototype(const internal::ClassDefineState* define) 
     if (prop.getter) {
       getterFun = newRawFunction(this, const_cast<PropDef*>(&prop), definePtr,
                                  [](const Arguments& args, void* data1, void* data2, bool) {
-                                   auto ptr = static_cast<InstanceClassOpaque*>(JS_GetOpaque(
-                                       qjs_interop::peekLocal(args.thiz()), kInstanceClassId));
-                                   if (ptr == nullptr || ptr->classDefine != data2) {
-                                     throw Exception(u8"call function on wrong receiver");
-                                   }
+                                   auto* ptr = getAndCheckInstance(args, data2);
+
                                    auto p = static_cast<PropDef*>(data1);
                                    Tracer tracer(args.engine(), p->traceName);
                                    return (p->getter)(ptr->scriptClassPolymorphicPointer);
@@ -489,14 +483,10 @@ Local<Object> QjsEngine::newPrototype(const internal::ClassDefineState* define) 
     if (prop.setter) {
       setterFun = newRawFunction(this, const_cast<PropDef*>(&prop), definePtr,
                                  [](const Arguments& args, void* data1, void* data2, bool) {
-                                   auto ptr = static_cast<InstanceClassOpaque*>(JS_GetOpaque(
-                                       qjs_interop::peekLocal(args.thiz()), kInstanceClassId));
-                                   if (ptr == nullptr || ptr->classDefine != data2) {
-                                     throw Exception(u8"call function on wrong receiver");
-                                   }
+                                   auto* ptr = getAndCheckInstance(args, data2);
+
                                    auto p = static_cast<PropDef*>(data1);
                                    Tracer tracer(args.engine(), p->traceName);
-
                                    (p->setter)(ptr->scriptClassPolymorphicPointer, args[0]);
                                    return Local<Value>();
                                  })
@@ -510,6 +500,17 @@ Local<Object> QjsEngine::newPrototype(const internal::ClassDefineState* define) 
                                        qjs_interop::getLocal(setterFun), JS_PROP_C_W_E);
     JS_FreeAtom(context_, atom);
     qjs_backend::checkException(ret);
+  }
+
+  if (define->getParent() != nullptr) {
+    auto parentIt = nativeInstanceRegistry_.find(define->getParent());
+    if (parentIt != nativeInstanceRegistry_.end()) {
+      auto ret = JS_SetPrototype(context_, qjs_interop::peekLocal(proto), parentIt->second.first);
+      qjs_backend::checkException(ret);
+    } else {
+      throw Exception("Parent class '" + define->getParent()->className +
+                      "' must be registered before child class '" + define->className + "'");
+    }
   }
   return proto;
 }
@@ -598,6 +599,22 @@ void* QjsEngine::performGetNativeInstance(const Local<script::Value>& value,
   return static_cast<InstanceClassOpaque*>(
              JS_GetOpaque(qjs_interop::peekLocal(value), kInstanceClassId))
       ->scriptClassPolymorphicPointer;
+}
+
+InstanceClassOpaque* QjsEngine::getAndCheckInstance(const Arguments& args, const void* data2) {
+  auto thiz = qjs_interop::peekLocal(args.thiz());
+  auto ptr = static_cast<InstanceClassOpaque*>(JS_GetOpaque(thiz, QjsEngine::kInstanceClassId));
+  auto def = static_cast<const internal::ClassDefineState*>(data2);
+
+  const auto* objectClassDefine =
+      ptr ? static_cast<const internal::ClassDefineState*>(ptr->classDefine) : nullptr;
+
+  if (!ptr || !objectClassDefine ||
+      (objectClassDefine != def && !objectClassDefine->isChildOf(def))) {
+    throw Exception(u8"call function on wrong receiver");
+  }
+
+  return ptr;
 }
 
 }  // namespace script::qjs_backend

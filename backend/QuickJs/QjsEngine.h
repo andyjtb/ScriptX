@@ -33,6 +33,8 @@ namespace script::qjs_backend {
 using RawFunctionCallback = Local<Value> (*)(const Arguments& args, void* data1, void* data2,
                                              bool isConstructorCall);
 
+class InstanceClassOpaque;
+
 class QjsEngine : public ScriptEngine {
  private:
   static JSClassID kPointerClassId;
@@ -153,6 +155,9 @@ class QjsEngine : public ScriptEngine {
   static T make(Args&&... args) {
     return T(std::forward<Args>(args)...);
   }
+
+  static InstanceClassOpaque* getAndCheckInstance(const Arguments& args,
+                                                  const void* data2);
 
  private:
   template <typename T>

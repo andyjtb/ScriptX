@@ -920,6 +920,7 @@ class ClassDefineBuilder : public internal::InstanceDefineBuilder<T> {
 
   std::string className_{};
   std::string nameSpace_{};
+  const internal::ClassDefineState* parentClassDefine_ = nullptr;
 
   // static
   std::vector<internal::StaticDefine::FunctionDefine> functions_{};
@@ -997,7 +998,8 @@ class ClassDefineBuilder : public internal::InstanceDefineBuilder<T> {
                           internal::StaticDefine{std::move(functions_), std::move(properties)},
                           internal::InstanceDefine{
                               std::move(Instance::constructor_), std::move(Instance::insFunctions_),
-                              std::move(Instance::insProperties_), internal::sizeof_helper_v<T>});
+                              std::move(Instance::insProperties_), internal::sizeof_helper_v<T>},
+                          parentClassDefine_);
     return define;
   }
 

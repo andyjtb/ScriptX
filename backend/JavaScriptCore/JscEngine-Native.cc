@@ -158,6 +158,19 @@ Local<Object> JscEngine::defineInstancePrototype(const internal::ClassDefineStat
 
     defineInstanceProperties(classDefine, get, set, jsObject, jsObject_def, proto);
   }
+
+  if (classDefine->getParent() != nullptr) {
+    auto parentRegistry = classRegistry_.find(classDefine->getParent());
+    if (parentRegistry != classRegistry_.end()) {
+      Local<Object> parentProto = parentRegistry->second.prototype.get();
+      JSObjectSetPrototype(context_, toJsc(context_, proto), toJsc(context_, parentProto));
+    } else {
+      throw Exception("Parent class '" + classDefine->getParent()->className +
+                     "' must be registered before child class '" +
+                     classDefine->className + "'");
+    }
+  }
+
   return proto;
 }
 
@@ -188,7 +201,12 @@ void JscEngine::defineInstanceFunction(const internal::ClassDefineState* classDe
 
       try {
         auto* t = static_cast<ScriptClass*>(JSObjectGetPrivate(thisObject));
-        if (!t || t->internalState_.classDefine != def) {
+        if (!t) {
+          throw Exception(u8"call function on wrong receiver");
+        }
+        auto* objectClassDefine = static_cast<const internal::ClassDefineState*>(
+            t->internalState_.classDefine);
+        if (objectClassDefine != def && !objectClassDefine->isChildOf(def)) {
           throw Exception(u8"call function on wrong receiver");
         }
         auto returnVal = callback(t->internalState_.polymorphicPointer, args);
@@ -248,7 +266,12 @@ void JscEngine::defineInstanceProperties(const internal::ClassDefineState* class
 
         try {
           auto* t = static_cast<ScriptClass*>(JSObjectGetPrivate(thisObject));
-          if (!t || t->internalState_.classDefine != def) {
+          if (!t) {
+            throw Exception(u8"call function on wrong receiver");
+          }
+          auto* objectClassDefine = static_cast<const internal::ClassDefineState*>(
+              t->internalState_.classDefine);
+          if (objectClassDefine != def && !objectClassDefine->isChildOf(def)) {
             throw Exception(u8"call function on wrong receiver");
           }
           auto value = (pp->getter)(t->internalState_.polymorphicPointer);
@@ -289,7 +312,12 @@ void JscEngine::defineInstanceProperties(const internal::ClassDefineState* class
         if (args.size() > 0) {
           try {
             auto* t = static_cast<ScriptClass*>(JSObjectGetPrivate(thisObject));
-            if (!t || t->internalState_.classDefine != def) {
+            if (!t) {
+              throw Exception(u8"call function on wrong receiver");
+            }
+            auto* objectClassDefine = static_cast<const internal::ClassDefineState*>(
+                t->internalState_.classDefine);
+            if (objectClassDefine != def && !objectClassDefine->isChildOf(def)) {
               throw Exception(u8"call function on wrong receiver");
             }
             (pp->setter)(t->internalState_.polymorphicPointer, args[0]);
@@ -350,7 +378,20 @@ bool JscEngine::performIsInstanceOf(const Local<script::Value>& value,
   auto it = classRegistry_.find(const_cast<internal::ClassDefineState*>(classDefine));
 
   if (it != classRegistry_.end() && !it->second.constructor.isEmpty()) {
-    return JSValueIsObjectOfClass(context_, toJsc(context_, value), it->second.instanceClass);
+    if (JSValueIsObjectOfClass(context_, toJsc(context_, value), it->second.instanceClass))
+      return true;
+
+    void* privateData = JSObjectGetPrivate(value.asObject().val_);
+    if (privateData) {
+      auto* objectClassDefine = static_cast<const internal::ClassDefineState*>(
+          static_cast<ScriptClass*>(privateData)->internalState_.classDefine);
+
+      if (objectClassDefine == classDefine)
+        return true;
+
+      if (objectClassDefine->isChildOf(classDefine))
+        return true;
+    }
   }
 
   return false;
