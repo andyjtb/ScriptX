@@ -158,7 +158,7 @@ add_test(
 )
 
 if (${SCRIPTX_BACKEND} STREQUAL Hermes)
-    if (NOT TARGET ScriptX)
+    if (TARGET ScriptX)
         target_link_libraries(ScriptX hermesvm_a)
     endif()
 endif()

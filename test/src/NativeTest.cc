@@ -669,10 +669,9 @@ TEST_F(NativeTest, CppNewMultipleInheritance) {
 
   // Test 1: Create from C++ and verify the instance is valid
   auto obj = createCppNewMultipleInheritance(21);
-  ASSERT_TRUE(obj.isObject());
 
   // Test 2: Get native instance and verify pointer is correct
-  auto* instance = engine->getNativeInstance<CppNewMultipleInheritance>(obj);
+  auto* instance = engine->getNativeInstance<CppNewMultipleInheritance>(obj.asValue());
   ASSERT_NE(instance, nullptr);
   EXPECT_EQ(instance, instance->thisPtr_);  // Verify pointer wasn't corrupted
 
