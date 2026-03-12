@@ -45,7 +45,7 @@ Local<Value> Arguments::operator[](size_t i) const {
 
 ScriptEngine* Arguments::engine() const { return callbackInfo_.engine_; }
 
-void ScriptClass::performConstructFromCpp(internal::TypeIndex typeIndex,
+void ScriptClass::performConstructFromCpp(void* derivedPtr, internal::TypeIndex typeIndex,
                                           const internal::ClassDefineState* classDefine) {
   auto engine = &wasm_backend::currentEngine();
 
@@ -57,7 +57,9 @@ void ScriptClass::performConstructFromCpp(internal::TypeIndex typeIndex,
     StackFrameScope scope;
     auto mark =
         wasm_backend::WasmEngine::make<Local<Value>>(wasm_backend::NativeHelper::pushCppNewMark());
-    Local<Number> ins = Number::newNumber(reinterpret_cast<int32_t>(this));
+    // Store derivedPtr (T*) instead of this (ScriptClass*) so that
+    // instanceTypeToScriptClass works correctly with multiple inheritance.
+    Local<Number> ins = Number::newNumber(reinterpret_cast<int32_t>(derivedPtr));
 
     std::initializer_list<Local<Value>> args{mark, ins};
     auto obj = engine->performNewNativeClass(typeIndex, classDefine, args.size(), args.begin());

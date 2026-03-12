@@ -117,15 +117,21 @@ Local<Object> HermesEngine::createConstructor(const internal::ClassDefineState* 
         auto scriptArgs = hermes_interop::makeArguments(engine, thisValue, arguments, count);
 
         StackFrameScope stack;
-        void* thiz = nullptr;
+        ScriptClass* scriptClass = nullptr;
+        void* polymorphicPtr = nullptr;
+
         if (count == 1 && arguments[0].isObject()) {
           if (arguments[0].asObject(runtime).hasNativeState(runtime)) {
             if (auto ptr = arguments[0].asObject(runtime).getNativeState(runtime)) {
               // this logic is for
               // ScriptClass::ScriptClass(ConstructFromCpp<T>)
+              // The holder contains both ScriptClass* and T* (polymorphicPointer)
+              // which are different addresses with multiple inheritance.
 
-              if (auto* scriptClass = dynamic_cast<NonOwningSharedScriptClassHolder*>(ptr.get())) {
-                thiz = scriptClass->sc;
+              if (auto* holder = dynamic_cast<NonOwningSharedScriptClassHolder*>(ptr.get())) {
+                // Use the pointers directly from the holder - no conversion needed
+                scriptClass = holder->sc;
+                polymorphicPtr = holder->polymorphicPointer;
               } else {
                 throw Exception("NativeState is of incorrect type");
               }
@@ -133,20 +139,23 @@ Local<Object> HermesEngine::createConstructor(const internal::ClassDefineState* 
           }
         }
 
-        if (thiz == nullptr) {
+        if (scriptClass == nullptr) {
           // this logic is for
           // ScriptClass::ScriptClass(const Local<Object>& thiz)
-          thiz = classDefine->instanceDefine.constructor(scriptArgs);
+          // Constructor returns T* which we need to convert to ScriptClass*
+          void* thiz = classDefine->instanceDefine.constructor(scriptArgs);
 
           if (thiz == nullptr) {
             throw Exception("can't create class " + classDefine->className);
           }
+
+          scriptClass = registry.instanceTypeToScriptClass(thiz);
+          polymorphicPtr = thiz;
         }
 
-        auto scriptClass = registry.instanceTypeToScriptClass(thiz);
         scriptClass->internalState_.scriptEngine_ = engine;
         scriptClass->internalState_.classDefine = classDefine;
-        scriptClass->internalState_.polymorphicPointer = thiz;
+        scriptClass->internalState_.polymorphicPointer = polymorphicPtr;
         scriptClass->internalState_.internalStore_ =
             hermes_interop::makeLocal<Value>(facebook::jsi::Array(runtime, 0));
 

@@ -55,11 +55,13 @@ ScriptClass::ScriptClass(const Local<Object>& scriptObject) : internalState_() {
   internalState_.weakRef_.SetWeak();
 }
 
-void ScriptClass::performConstructFromCpp(internal::TypeIndex typeIndex,
+void ScriptClass::performConstructFromCpp(void* derivedPtr, internal::TypeIndex typeIndex,
                                           const internal::ClassDefineState* classDefine) {
   auto v8Engine = v8_backend::currentEngine();
   auto symbol = v8Engine->constructorMarkSymbol_.Get(v8Engine->isolate_);
-  auto pointer = v8::External::New(v8Engine->isolate_, this);
+  // Store derivedPtr (T*) instead of this (ScriptClass*) so that
+  // instanceTypeToScriptClass works correctly with multiple inheritance.
+  auto pointer = v8::External::New(v8Engine->isolate_, derivedPtr);
 
   std::initializer_list<Local<Value>> args{v8_backend::V8Engine::make<Local<Value>>(symbol),
                                            v8_backend::V8Engine::make<Local<Value>>(pointer)};

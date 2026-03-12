@@ -63,12 +63,14 @@ Local<Array> ScriptClass::getInternalStore() const {
       .asArray();
 }
 
-void ScriptClass::performConstructFromCpp(internal::TypeIndex typeIndex,
+void ScriptClass::performConstructFromCpp(void* derivedPtr, internal::TypeIndex typeIndex,
                                           const internal::ClassDefineState* classDefine) {
   auto jscEngine = jsc_backend::currentEngine();
   auto symbol = jscEngine->constructorMarkSymbol_.get();
+  // Store derivedPtr (T*) instead of this (ScriptClass*) so that
+  // instanceTypeToScriptClass works correctly with multiple inheritance.
   auto thiz = jsc_backend::JscEngine::make<Local<Value>>(
-      JSObjectMake(jscEngine->context_, jsc_backend::JscEngine::externalClass_, this));
+      JSObjectMake(jscEngine->context_, jsc_backend::JscEngine::externalClass_, derivedPtr));
 
   const std::initializer_list<Local<Value>> args{symbol, thiz};
   auto obj = jscEngine->performNewNativeClass(typeIndex, classDefine, args.size(), args.begin());

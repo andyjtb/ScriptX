@@ -33,7 +33,7 @@ Local<Value> Arguments::operator[](size_t i) const { return {}; }
 
 ScriptEngine* Arguments::engine() const { return nullptr; }
 
-void ScriptClass::performConstructFromCpp(internal::TypeIndex typeIndex,
+void ScriptClass::performConstructFromCpp(void* /* derivedPtr */, internal::TypeIndex typeIndex,
                                           const internal::ClassDefineState* classDefine) {
   TEMPLATE_NOT_IMPLEMENTED();
 }

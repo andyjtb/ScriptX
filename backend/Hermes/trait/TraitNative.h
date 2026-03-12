@@ -47,9 +47,11 @@ struct SharedScriptClassHolder : public facebook::jsi::NativeState {
 };
 
 struct NonOwningSharedScriptClassHolder : public facebook::jsi::NativeState {
-  NonOwningSharedScriptClassHolder(ScriptClass* sc) : sc(sc) {}
+  NonOwningSharedScriptClassHolder(ScriptClass* sc, void* polymorphicPtr)
+      : sc(sc), polymorphicPointer(polymorphicPtr) {}
 
   ScriptClass* sc = nullptr;
+  void* polymorphicPointer = nullptr;  // The derived class (T*) pointer for instance callbacks
 };
 
 }  // namespace hermes_backend

@@ -64,7 +64,7 @@ ScriptClass::ScriptClass(const script::Local<script::Object>& scriptObject) : in
   internalState_.weakRef_ = scriptObject;
 }
 
-void ScriptClass::performConstructFromCpp(internal::TypeIndex typeIndex,
+void ScriptClass::performConstructFromCpp(void* derivedPtr, internal::TypeIndex typeIndex,
                                           const internal::ClassDefineState* classDefine) {
   auto engine = lua_backend::currentEngine();
 
@@ -81,7 +81,9 @@ void ScriptClass::performConstructFromCpp(internal::TypeIndex typeIndex,
                           const_cast<void*>(lua_backend::LuaEngine::kLuaNativeConstructorMarker_));
     auto mark = lua_gettop(lua);
 
-    lua_pushlightuserdata(lua, this);
+    // Store derivedPtr (T*) instead of this (ScriptClass*) so that
+    // instanceTypeToScriptClass works correctly with multiple inheritance.
+    lua_pushlightuserdata(lua, derivedPtr);
     auto thiz = lua_gettop(lua);
 
     std::initializer_list<Local<Value>> args{lua_backend::LuaEngine::make<Local<Value>>(mark),

@@ -172,7 +172,12 @@ class ScriptClass {
    */
   template <typename T>
   explicit ScriptClass(ConstructFromCpp<T> policy) {
-    performConstructFromCpp(internal::typeIndexOf<T>(),
+    // Compute the derived class pointer (T*) from 'this' (ScriptClass*).
+    // This is valid because the memory layout is established, even though T's
+    // constructor hasn't completed yet. We need T* for polymorphicPointer
+    // to correctly handle multiple inheritance with polymorphic base classes.
+    T* derivedPtr = static_cast<T*>(this);
+    performConstructFromCpp(derivedPtr, internal::typeIndexOf<T>(),
                             &EngineScope::currentEngineChecked().getClassDefine<T>());
   }
 
@@ -230,10 +235,12 @@ class ScriptClass {
  private:
   /**
    * non-template version of `explicit ScriptClass(ConstructFromCpp<T> policy)`
+   * @param derivedPtr the derived class (T*) pointer, needed for polymorphicPointer
+   *                   with multiple inheritance where T* != ScriptClass*
    * @param typeIndex
    * @param classDefine
    */
-  void performConstructFromCpp(internal::TypeIndex typeIndex,
+  void performConstructFromCpp(void* derivedPtr, internal::TypeIndex typeIndex,
                                const internal::ClassDefineState* classDefine);
 
  private:

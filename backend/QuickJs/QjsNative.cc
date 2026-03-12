@@ -83,14 +83,16 @@ Local<Array> ScriptClass::getInternalStore() const {
   throw Exception("can't getScriptObject in finalizer");
 }
 
-void ScriptClass::performConstructFromCpp(internal::TypeIndex typeIndex,
+void ScriptClass::performConstructFromCpp(void* derivedPtr, internal::TypeIndex typeIndex,
                                           const internal::ClassDefineState* classDefine) {
   auto& engine = qjs_backend::currentEngine();
   internalState_.engine = &engine;
 
   auto pointer = JS_NewObjectClass(engine.context_, qjs_backend::QjsEngine::kPointerClassId);
   qjs_backend::checkException(pointer);
-  JS_SetOpaque(pointer, this);
+  // Store derivedPtr (T*) instead of this (ScriptClass*) so that
+  // instanceTypeToScriptClass works correctly with multiple inheritance.
+  JS_SetOpaque(pointer, derivedPtr);
 
   std::initializer_list<Local<Value>> args{qjs_interop::makeLocal<Value>(pointer)};
   auto ret = engine.performNewNativeClass(typeIndex, classDefine, args.size(), args.begin());

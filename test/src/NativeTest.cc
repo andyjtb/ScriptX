@@ -618,6 +618,102 @@ return ins:greet();
   EXPECT_STREQ(ret.asString().toString().c_str(), "hello world cpp ");
 }
 
+// Test ConstructFromCpp with multiple inheritance where first base class is polymorphic.
+// This reproduces a bug where instanceTypeToScriptClass receives ScriptClass* but treats it as T*,
+// causing memory corruption due to incorrect pointer arithmetic.
+class PolymorphicBase {
+ public:
+  int value = 42;
+  // Virtual function makes this class polymorphic, adding a vtable pointer
+  virtual int getValue() const { return value; }
+  virtual ~PolymorphicBase() = default;
+};
+
+class CppNewMultipleInheritance : public PolymorphicBase, public ScriptClass {
+ public:
+  // used to verify the correct pointer is passed to callbacks
+  void* thisPtr_ = nullptr;
+
+  explicit CppNewMultipleInheritance(int val)
+      : ScriptClass(ScriptClass::ConstructFromCpp<CppNewMultipleInheritance>{}) {
+    value = val;
+    thisPtr_ = this;
+  }
+
+  int getValue() const override { return value * 2; }
+
+  int getValueFromScript() const { return getValue(); }
+
+  using ScriptClass::getScriptObject;
+};
+
+Local<Object> createCppNewMultipleInheritance(int val) {
+  auto ptr = new CppNewMultipleInheritance(val);
+  return ptr->getScriptObject();
+}
+
+static auto defineMultiInheritance =
+    defineClass<CppNewMultipleInheritance>("CppNewMultiInheritTest")
+        .nameSpace("multiinherit")
+        .constructor([](const Arguments&) -> CppNewMultipleInheritance* {
+          throw Exception("this class can't be created in script");
+        })
+        .instanceFunction("getValue", &CppNewMultipleInheritance::getValueFromScript)
+        .instanceProperty("value", &PolymorphicBase::value)
+        .function("create", createCppNewMultipleInheritance)
+        .build();
+
+TEST_F(NativeTest, CppNewMultipleInheritance) {
+  EngineScope scope(engine);
+  engine->registerNativeClass(defineMultiInheritance);
+
+  // Test 1: Create from C++ and verify the instance is valid
+  auto obj = createCppNewMultipleInheritance(21);
+  ASSERT_TRUE(obj.isObject());
+
+  // Test 2: Get native instance and verify pointer is correct
+  auto* instance = engine->getNativeInstance<CppNewMultipleInheritance>(obj);
+  ASSERT_NE(instance, nullptr);
+  EXPECT_EQ(instance, instance->thisPtr_);  // Verify pointer wasn't corrupted
+
+  // Test 3: Verify the value is correct (tests that memory wasn't corrupted)
+  EXPECT_EQ(instance->value, 21);
+  EXPECT_EQ(instance->getValue(), 42);  // 21 * 2
+
+  // Test 4: Call instance method from script - this will crash if pointer is wrong
+  engine->set("testObj", obj);
+  auto ret = engine->eval(TS().js("testObj.getValue()")
+                              .lua("return testObj:getValue()")
+                              .select());
+  ASSERT_TRUE(ret.isNumber());
+  EXPECT_EQ(ret.asNumber().toInt32(), 42);
+
+  // Test 5: Access instance property from script
+  auto valRet = engine->eval(TS().js("testObj.value")
+                                 .lua("return testObj.value")
+                                 .select());
+  ASSERT_TRUE(valRet.isNumber());
+  EXPECT_EQ(valRet.asNumber().toInt32(), 21);
+
+  // Test 6: Create from script using factory function
+  auto ret2 = engine->eval(TS().js(
+                                   R"(
+(function() {
+    const ins = multiinherit.CppNewMultiInheritTest.create(10);
+    return ins.getValue();
+})()
+)")
+                               .lua(
+                                   R"(
+local ins = multiinherit.CppNewMultiInheritTest.create(10);
+return ins:getValue();
+)")
+                               .select());
+
+  ASSERT_TRUE(ret2.isNumber());
+  EXPECT_EQ(ret2.asNumber().toInt32(), 20);  // 10 * 2
+}
+
 }  // namespace
 
 TEST_F(NativeTest, BindExceptionTest) {

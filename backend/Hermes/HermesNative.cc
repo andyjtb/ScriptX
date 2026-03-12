@@ -53,14 +53,17 @@ SharedScriptClassHolder::~SharedScriptClassHolder() {
 
 }  // namespace hermes_backend
 
-void ScriptClass::performConstructFromCpp(internal::TypeIndex typeIndex,
+void ScriptClass::performConstructFromCpp(void* derivedPtr, internal::TypeIndex typeIndex,
                                           const internal::ClassDefineState* classDefine) {
   auto engine = hermes_backend::currentEngine();
   auto& runtime = *hermes_interop::getEngineRuntime(engine);
 
   auto jsiObj = facebook::jsi::Object(runtime);
-  jsiObj.setNativeState(runtime,
-                        std::make_shared<hermes_backend::NonOwningSharedScriptClassHolder>(this));
+  // Store both the ScriptClass* (this) and the derived T* (derivedPtr).
+  // derivedPtr is needed for polymorphicPointer when T has multiple inheritance
+  // with a polymorphic base class, where T* != ScriptClass*.
+  jsiObj.setNativeState(
+      runtime, std::make_shared<hermes_backend::NonOwningSharedScriptClassHolder>(this, derivedPtr));
 
   auto thiz = hermes_interop::makeLocal<Value>(std::move(jsiObj));
   auto obj = engine->performNewNativeClass(typeIndex, classDefine, 1, &thiz);
