@@ -67,7 +67,7 @@ struct hermes_interop {
   }
 
   static bool isObjectType(const Local<Value>& val,
-                           bool (facebook::jsi::Object::*isFunc)(facebook::jsi::Runtime&) const) {
+                           bool (facebook::jsi::Object::*isFunc)(facebook::jsi::IRuntime&) const) {
     return isType(val, &facebook::jsi::Value::isObject) &&
            (val.val_.valuePtr->asObject(*currentEngineRuntime()).*isFunc)(*currentEngineRuntime());
   }
