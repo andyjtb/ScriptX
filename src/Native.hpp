@@ -935,6 +935,17 @@ class ClassDefineBuilder : public internal::InstanceDefineBuilder<T> {
     return *this;
   }
 
+  /**
+   * Give this class the prototype chain of an already-registered ParentClass, so instances are
+   * `instanceof` the parent and inherit its properties/methods. The parent MUST be registered
+   * first. Must be called under an EngineScope.
+   */
+  template <typename ParentClass>
+  ClassDefineBuilder<T>& inheritsFrom() {
+    parentClassDefine_ = &EngineScope::currentEngineChecked().getClassDefine<ParentClass>();
+    return *this;
+  }
+
   ClassDefineBuilder<T>& function(std::string name, FunctionCallback func) {
     functions_.push_back(internal::StaticDefine::FunctionDefine{
         std::move(name), std::forward<FunctionCallback>(func), {}});

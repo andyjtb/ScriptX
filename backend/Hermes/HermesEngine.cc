@@ -29,6 +29,7 @@ HermesEngine::HermesEngine(std::shared_ptr<utils::MessageQueue> queue)
                                  .withIntl(false)
                                  .withEnableHermesInternal(true)
                                  .withMicrotaskQueue(true)
+                                 .withES6BlockScoping(true)
 #if HERMES_ENABLE_DEBUGGER
                                  .withSampleProfiling (true)
 #endif
