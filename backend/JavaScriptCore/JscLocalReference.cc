@@ -174,6 +174,11 @@ REF_IMPL_TO_VALUE(Unsupported)
 
 Local<Value>::Local() noexcept : val_() {}
 
+Local<Value> Local<Value>::newNull() {
+  auto context = jsc_backend::currentEngineContextChecked();
+  return Local<Value>(const_cast<typename Local<Value>::InternalLocalRef>(JSValueMakeNull(context)));
+}
+
 Local<Value>::Local(InternalLocalRef v8Local) : val_(v8Local) {}
 
 bool Local<Value>::isNull() const { return jsc_backend::isNullOrUndefined(val_); }

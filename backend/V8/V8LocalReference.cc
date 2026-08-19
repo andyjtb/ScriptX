@@ -108,6 +108,10 @@ Local<Value>::Local() noexcept : val_() {}
 
 Local<Value>::Local(InternalLocalRef v8Local) : val_(v8Local) {}
 
+Local<Value> Local<Value>::newNull() {
+  return Local<Value>(v8::Null(v8_backend::currentEngineIsolateChecked()));
+}
+
 bool Local<Value>::isNull() const { return val_.IsEmpty() || val_->IsNullOrUndefined(); }
 
 void Local<Value>::reset() { val_.Clear(); }

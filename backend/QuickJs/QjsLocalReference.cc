@@ -105,6 +105,8 @@ Local<Value>::Local() noexcept : val_(JS_UNDEFINED) {}
 
 Local<Value>::Local(InternalLocalRef local) : val_(local) {}
 
+Local<Value> Local<Value>::newNull() { return Local<Value>(JS_NULL); }
+
 bool Local<Value>::isNull() const {
   return JS_IsNull(val_) || JS_IsUninitialized(val_) || JS_IsUndefined(val_);
 }

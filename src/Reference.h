@@ -274,6 +274,13 @@ class Local<Value> {
    */
   Local() noexcept;
 
+  /**
+   * create a Local holding the JavaScript `null` value (distinct from a default-constructed
+   * Local, which is an empty reference that surfaces to script as `undefined`). DOM accessors
+   * that return "no node" need real `null` so script `x === null` checks work.
+   */
+  static Local<Value> newNull();
+
   ValueKind getKind() const;
 
   bool isNull() const;

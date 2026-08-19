@@ -112,6 +112,12 @@ REF_IMPL_TO_VALUE(Unsupported)
 
 Local<Value>::Local() noexcept : val_(facebook::jsi::Value()) {}
 
+Local<Value> Local<Value>::newNull() {
+  Local<Value> value;
+  value.val_.valuePtr = std::make_shared<facebook::jsi::Value>(facebook::jsi::Value::null());
+  return value;
+}
+
 Local<Value>::Local(InternalLocalRef hermesLocal) : val_(hermesLocal) {}
 
 bool Local<Value>::isNull() const {
