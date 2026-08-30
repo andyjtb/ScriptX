@@ -36,7 +36,9 @@ struct HermesScriptClassState {
   const void* classDefine = nullptr;
   void* polymorphicPointer = nullptr;
   Local<Value> internalStore_;
-  std::shared_ptr<facebook::jsi::Value> weakRef_;
+  std::shared_ptr<facebook::jsi::Value> weakRef_;  // C++-owned instances: strong
+  // Script-owned instances: weak, since the object owns the ScriptClass through its native state.
+  std::unique_ptr<facebook::jsi::WeakObject> scriptOwnedRef_;
 };
 
 struct SharedScriptClassHolder : public facebook::jsi::NativeState {

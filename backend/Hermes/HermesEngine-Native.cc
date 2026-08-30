@@ -156,8 +156,10 @@ Local<Object> HermesEngine::createConstructor(const internal::ClassDefineState* 
         scriptClass->internalState_.scriptEngine_ = engine;
         scriptClass->internalState_.classDefine = classDefine;
         scriptClass->internalState_.polymorphicPointer = polymorphicPtr;
-        scriptClass->internalState_.internalStore_ =
-            hermes_interop::makeLocal<Value>(facebook::jsi::Array(runtime, 0));
+        // Keep a store the constructor already wrote to.
+        if (!scriptClass->internalState_.internalStore_.isArray())
+          scriptClass->internalState_.internalStore_ =
+              hermes_interop::makeLocal<Value>(facebook::jsi::Array(runtime, 0));
 
         if (registry.prototype.val_.valuePtr != nullptr) {
           auto Object = runtime.global().getPropertyAsObject(runtime, "Object");
@@ -166,12 +168,17 @@ Local<Object> HermesEngine::createConstructor(const internal::ClassDefineState* 
           auto obj = createFunc.call(runtime, *registry.prototype.val_.valuePtr);
           obj.asObject(runtime).setNativeState(
               runtime, std::make_shared<SharedScriptClassHolder>(scriptClass));
+          // Script sees `obj`, not the constructor's `this`.
+          scriptClass->internalState_.scriptOwnedRef_ =
+              std::make_unique<facebook::jsi::WeakObject>(runtime, obj.asObject(runtime));
 
           return obj;
         }
 
         thisValue.asObject(runtime).setNativeState(
             runtime, std::make_shared<SharedScriptClassHolder>(scriptClass));
+        scriptClass->internalState_.scriptOwnedRef_ =
+            std::make_unique<facebook::jsi::WeakObject>(runtime, thisValue.asObject(runtime));
 
         return {};
       });

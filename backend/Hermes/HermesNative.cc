@@ -87,6 +87,11 @@ Local<Object> ScriptClass::getScriptObject() const {
   if (auto val = internalState_.weakRef_)
     return hermes_interop::makeLocal<Object>(val->asObject(*runtime));
 
+  if (auto& weak = internalState_.scriptOwnedRef_) {
+    auto val = weak->lock(*runtime);
+    if (val.isObject()) return hermes_interop::makeLocal<Object>(val.asObject(*runtime));
+  }
+
   return Object::newObject();
 }
 
@@ -104,6 +109,12 @@ ScriptEngine* ScriptClass::getScriptEngine() const { return internalState_.scrip
 
 bool ScriptClass::isScriptObjectNull() const {
   if (auto val = internalState_.weakRef_) return val->isNull();
+
+  if (auto& weak = internalState_.scriptOwnedRef_) {
+    auto* runtime = hermes_interop::getEngineRuntime(internalState_.scriptEngine_);
+    return !weak->lock(*runtime).isObject();
+  }
+
   return true;
 }
 
