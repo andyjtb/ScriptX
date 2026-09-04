@@ -23,9 +23,14 @@
 
 namespace script::hermes_backend {
 
-HermesEngine::HermesEngine(std::shared_ptr<utils::MessageQueue> queue)
+HermesEngine::HermesEngine(std::shared_ptr<utils::MessageQueue> queue, const EngineOptions& options)
     : messageQueue_(queue ? std::move(queue) : std::make_shared<utils::MessageQueue>()) {
+  auto gcConfig = hermes::vm::GCConfig::Builder();
+  if (options.initialHeapBytes > 0) {
+    gcConfig.withInitHeapSize(static_cast<hermes::vm::gcheapsize_t>(options.initialHeapBytes));
+  }
   const auto runtimeConfig = hermes::vm::RuntimeConfig::Builder()
+                                 .withGCConfig(gcConfig.build())
                                  .withIntl(false)
                                  .withEnableHermesInternal(true)
                                  .withMicrotaskQueue(true)
@@ -43,6 +48,9 @@ HermesEngine::HermesEngine(std::shared_ptr<utils::MessageQueue> queue)
 }
 
 HermesEngine::HermesEngine() : HermesEngine(std::shared_ptr<utils::MessageQueue>{}) {}
+
+HermesEngine::HermesEngine(const EngineOptions& options)
+    : HermesEngine(std::shared_ptr<utils::MessageQueue>{}, options) {}
 
 HermesEngine::~HermesEngine() = default;
 

@@ -27,6 +27,19 @@ namespace script::v8_backend {
 // create a master engine (opposite to slave engine)
 V8Engine::V8Engine(std::shared_ptr<utils::MessageQueue> mq) : V8Engine(std::move(mq), nullptr) {}
 
+V8Engine::V8Engine(std::shared_ptr<utils::MessageQueue> mq, const EngineOptions& options)
+    : V8Engine(std::move(mq), [this, options]() {
+        v8::Isolate::CreateParams createParams;
+        allocator_.reset(v8::ArrayBuffer::Allocator::NewDefaultAllocator());
+        createParams.array_buffer_allocator = allocator_.get();
+        if (options.initialHeapBytes > 0) {
+          createParams.constraints.set_initial_old_generation_size_in_bytes(options.initialHeapBytes);
+        }
+        return v8::Isolate::New(createParams);
+      }) {}
+
+V8Engine::V8Engine(const EngineOptions& options) : V8Engine(std::shared_ptr<utils::MessageQueue>{}, options) {}
+
 V8Engine::V8Engine(std::shared_ptr<utils::MessageQueue> mq,
                    const std::function<v8::Isolate*()>& isolateFactory)
     : v8Platform_(V8Platform::getPlatform()),

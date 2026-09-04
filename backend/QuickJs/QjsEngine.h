@@ -76,7 +76,13 @@ class QjsEngine : public ScriptEngine {
 
  public:
   explicit QjsEngine(std::shared_ptr<::script::utils::MessageQueue> queue = nullptr,
-                     const QjsFactory& factory = nullptr);
+                     const QjsFactory& factory = nullptr, const EngineOptions& options = {});
+
+  /**
+   * QuickJS has no heap reservation; initialHeapBytes sets the allocation the runtime may make
+   * before its first garbage collection, which is the nearest equivalent.
+   */
+  explicit QjsEngine(const EngineOptions& options);
 
   SCRIPTX_DISALLOW_COPY_AND_MOVE(QjsEngine);
 

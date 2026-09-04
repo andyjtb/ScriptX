@@ -31,6 +31,8 @@ JSClassRef JscEngine::externalClass_{};
 // cast to void* to suppress g++ -Werror=address
 bool JscEngine::hasByteBufferAPI_ = reinterpret_cast<void*>(&JSValueGetTypedArrayType) != nullptr;
 
+JscEngine::JscEngine(const EngineOptions&) : JscEngine(std::shared_ptr<utils::MessageQueue>{}) {}
+
 JscEngine::JscEngine(std::shared_ptr<utils::MessageQueue> mq)
     : messageQueue_(mq ? std::move(mq) : std::make_shared<utils::MessageQueue>()) {
   std::call_once(globalClassRefFlag, []() {

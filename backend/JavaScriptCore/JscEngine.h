@@ -146,6 +146,9 @@ class JscEngine : public ::script::ScriptEngine {
  public:
   explicit JscEngine(std::shared_ptr<utils::MessageQueue> messageQueue = {});
 
+  /** JavaScriptCore's C API has no heap sizing, so the options are accepted and ignored. */
+  explicit JscEngine(const EngineOptions& options);
+
   void destroy() noexcept override;
 
   bool isDestroying() const override { return isDestroying_; }

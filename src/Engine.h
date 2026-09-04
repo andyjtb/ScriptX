@@ -29,6 +29,15 @@
 
 namespace script {
 
+/**
+ * Options a backend may honour when creating an engine. A backend that does not support an
+ * option ignores it; a backend without an options constructor is created with none.
+ */
+struct EngineOptions {
+  /** Initial heap reservation in bytes, 0 for the backend default. */
+  size_t initialHeapBytes = 0;
+};
+
 class ScriptEngine {
  protected:
   std::unordered_map<internal::TypeIndex, const internal::ClassDefineState*> classDefineRegistry_{};

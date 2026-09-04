@@ -50,8 +50,8 @@ class HermesEngine : public ScriptEngine {
   std::unordered_map<const void*, ClassRegistryData> classRegistry_;
 
  public:
-  HermesEngine(std::shared_ptr<::script::utils::MessageQueue> queue);
-
+  HermesEngine(std::shared_ptr<::script::utils::MessageQueue> queue, const EngineOptions& options = {});
+  explicit HermesEngine(const EngineOptions& options);
   HermesEngine();
 
   SCRIPTX_DISALLOW_COPY_AND_MOVE(HermesEngine);

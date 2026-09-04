@@ -24,6 +24,8 @@ TemplateEngine::TemplateEngine(std::shared_ptr<utils::MessageQueue> queue) {}
 
 TemplateEngine::TemplateEngine() : TemplateEngine(std::shared_ptr<utils::MessageQueue>{}) {}
 
+TemplateEngine::TemplateEngine(const EngineOptions&) : TemplateEngine() {}
+
 TemplateEngine::~TemplateEngine() = default;
 
 void TemplateEngine::destroy() noexcept {}

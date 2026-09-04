@@ -86,6 +86,10 @@ class V8Engine : public ::script::ScriptEngine {
  public:
   explicit V8Engine(std::shared_ptr<utils::MessageQueue> messageQueue = {});
 
+  /** initialHeapBytes becomes the isolate's initial old-generation size. */
+  V8Engine(std::shared_ptr<utils::MessageQueue> messageQueue, const EngineOptions& options);
+  explicit V8Engine(const EngineOptions& options);
+
   /**
    * Create a ScriptEngine instance wrapping existing v8 instance, especially for NODE JS addons.
    * After creating such instance, there will be a global EngineScope for CURRENT THREAD, until you

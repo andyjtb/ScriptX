@@ -28,6 +28,12 @@ class TemplateEngine : public ScriptEngine {
  public:
   TemplateEngine(std::shared_ptr<::script::utils::MessageQueue> queue);
 
+  /**
+   * Optional: a backend that can size its heap honours EngineOptions here. Without this
+   * constructor the engine is created with default options.
+   */
+  explicit TemplateEngine(const EngineOptions& options);
+
   TemplateEngine();
 
   SCRIPTX_DISALLOW_COPY_AND_MOVE(TemplateEngine);

@@ -80,7 +80,8 @@ constexpr auto kGetByteBufferInfo = R"(
 })
 )";
 
-QjsEngine::QjsEngine(std::shared_ptr<utils::MessageQueue> queue, const QjsFactory& factory)
+QjsEngine::QjsEngine(std::shared_ptr<utils::MessageQueue> queue, const QjsFactory& factory,
+                     const EngineOptions& options)
     : queue_(queue ? std::move(queue) : std::make_shared<utils::MessageQueue>()) {
   if (factory) {
     std::tie(runtime_, context_) = factory();
@@ -95,8 +96,14 @@ QjsEngine::QjsEngine(std::shared_ptr<utils::MessageQueue> queue, const QjsFactor
     throw std::logic_error("QjsEngine: runtime or context is nullptr");
   }
 
+  if (options.initialHeapBytes > 0) {
+    JS_SetGCThreshold(runtime_, options.initialHeapBytes);
+  }
+
   initEngineResource();
 }
+
+QjsEngine::QjsEngine(const EngineOptions& options) : QjsEngine(nullptr, nullptr, options) {}
 
 void QjsEngine::initEngineResource() {
   std::call_once(kGlobalQjsClass, [this]() {
