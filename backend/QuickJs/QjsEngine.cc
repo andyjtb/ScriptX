@@ -409,7 +409,14 @@ Local<Object> QjsEngine::newConstructor(
         assert(registry != engine->nativeInstanceRegistry_.end());
 
         auto obj = JS_NewObjectClass(engine->context_, kInstanceClassId);
-        auto ret = JS_SetPrototype(engine->context_, obj, registry->second.first);
+
+        // Built from new.target's prototype, so a JS class extending this one keeps its own; a
+        // target without one falls back to the registered prototype.
+        auto targetProto =
+            JS_GetPropertyStr(engine->context_, args.callbackInfo_.thiz_, "prototype");
+        auto ret = JS_SetPrototype(engine->context_, obj,
+                                   JS_IsObject(targetProto) ? targetProto : registry->second.first);
+        JS_FreeValue(engine->context_, targetProto);
         checkException(ret);
 
         void* instance = nullptr;

@@ -161,7 +161,16 @@ Local<Object> HermesEngine::createConstructor(const internal::ClassDefineState* 
           scriptClass->internalState_.internalStore_ =
               hermes_interop::makeLocal<Value>(facebook::jsi::Array(runtime, 0));
 
-        if (registry.prototype.val_.valuePtr != nullptr) {
+        // `new` built `this` from new.target.prototype, so a JS class extending this one has its
+        // own prototype there already and keeping it is what leaves the subclass intact. Called
+        // as a plain function instead, `this` is the global object and fails the instanceof.
+        const bool constructed =
+            thisValue.isObject() && !registry.constructor.isEmpty() &&
+            runtime.instanceOf(thisValue.asObject(runtime),
+                               registry.constructor.val_.valuePtr->asObject(runtime).asFunction(
+                                   runtime));
+
+        if (!constructed && registry.prototype.val_.valuePtr != nullptr) {
           auto Object = runtime.global().getPropertyAsObject(runtime, "Object");
           auto createFunc = Object.getPropertyAsFunction(runtime, "create");
 

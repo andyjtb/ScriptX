@@ -74,7 +74,7 @@ void JscEngine::defineInstance(const internal::ClassDefineState* classDefine, Lo
 
   JSClassDefinition staticDefine = kJSClassDefinitionEmpty;
 
-  staticDefine.callAsConstructor = createConstructor();
+  staticDefine.callAsFunction = createConstructor();
   staticDefine.hasInstance = [](JSContextRef ctx, JSObjectRef constructor,
                                 JSValueRef possibleInstance, JSValueRef*) -> bool {
     auto engine = static_cast<JscEngine*>(JSObjectGetPrivate(JSContextGetGlobalObject(ctx)));
@@ -83,10 +83,12 @@ void JscEngine::defineInstance(const internal::ClassDefineState* classDefine, Lo
   };
 
   auto staticClass = JSClassCreate(&staticDefine);
-  object = Local<Object>(
+  auto nativeConstructor = Local<Object>(
       JSObjectMake(context_, staticClass, const_cast<internal::ClassDefineState*>(classDefine)));
   // not used anymore
   JSClassRelease(staticClass);
+
+  object = wrapConstructor(nativeConstructor);
   registry.constructor = object.asObject();
 
   auto prototype = defineInstancePrototype(classDefine);
@@ -95,9 +97,23 @@ void JscEngine::defineInstance(const internal::ClassDefineState* classDefine, Lo
   registry.prototype = prototype;
 }
 
-JSObjectCallAsConstructorCallback JscEngine::createConstructor() {
-  return [](JSContextRef ctx, JSObjectRef constructor, size_t argumentCount,
-            const JSValueRef arguments[], JSValueRef* exception) {
+Local<Object> JscEngine::wrapConstructor(const Local<Object>& nativeConstructor) {
+  if (constructorWrapperMaker_.isEmpty()) {
+    // Reflect.apply, not ctor.apply: a JSClass object is callable but does not inherit
+    // Function.prototype, so it has no apply of its own.
+    constructorWrapperMaker_ =
+        eval(String::newString("(function (ctor) { return function () { return Reflect.apply(ctor, "
+                               "this, arguments); }; })"))
+            .asObject();
+  }
+
+  return constructorWrapperMaker_.get().asValue().asFunction().call({}, nativeConstructor).asObject();
+}
+
+JSObjectCallAsFunctionCallback JscEngine::createConstructor() {
+  return [](JSContextRef ctx, JSObjectRef constructor, JSObjectRef thisObject,
+            size_t argumentCount, const JSValueRef arguments[],
+            JSValueRef* exception) -> JSValueRef {
     auto engine = static_cast<JscEngine*>(JSObjectGetPrivate(JSContextGetGlobalObject(ctx)));
     auto def = static_cast<const internal::ClassDefineState*>(JSObjectGetPrivate(constructor));
 
@@ -131,8 +147,18 @@ JSObjectCallAsConstructorCallback JscEngine::createConstructor() {
         scriptClass->internalState_.classDefine = def;
         scriptClass->internalState_.polymorphicPointer = thiz;
         JSObjectSetPrivate(object, scriptClass);
+
+        // `this` carries new.target's prototype, so a JS class extending this one keeps its own.
+        // Called as a plain function, `this` is the global object and fails the instanceof.
+        const bool constructed =
+            thisObject != nullptr && !registry.constructor.isEmpty() &&
+            JSValueIsInstanceOfConstructor(ctx, thisObject, registry.constructor.get().val_,
+                                           nullptr);
+
         JSObjectSetPrototype(ctx, object,
-                             toJsc(engine->context_, registry.prototype.get().asValue()));
+                             constructed
+                                 ? JSObjectGetPrototype(ctx, thisObject)
+                                 : toJsc(engine->context_, registry.prototype.get().asValue()));
         return object;
       } else {
         throw Exception("constructor returns null");

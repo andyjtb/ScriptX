@@ -135,6 +135,7 @@ class JscEngine : public ::script::ScriptEngine {
   std::unique_ptr<script::internal::SharedResourcePointer<ContextGroup>> contextGroup_;
 
   JSGlobalContextRef context_ = nullptr;
+  Global<Object> constructorWrapperMaker_;
   Global<Value> internalStorageSymbol_;
   Global<Value> constructorMarkSymbol_;
   Global<Function> getInternalStorageBySymbolFunction_;
@@ -241,7 +242,11 @@ class JscEngine : public ::script::ScriptEngine {
   void defineInstance(const internal::ClassDefineState* classDefine, Local<Value>& object,
                       ClassRegistryData& registry);
 
-  JSObjectCallAsConstructorCallback createConstructor();
+  JSObjectCallAsFunctionCallback createConstructor();
+
+  /** The native constructor behind an ordinary JS function, which `new` calls with a `this` it has
+      already built from new.target.prototype - the only sight of new.target the C API affords. */
+  Local<Object> wrapConstructor(const Local<Object>& nativeConstructor);
 
   Local<Object> defineInstancePrototype(const internal::ClassDefineState* classDefine);
 
