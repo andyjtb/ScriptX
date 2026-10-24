@@ -108,16 +108,18 @@ Global<T>& Global<T>::operator=(const script::Local<T>& assign) {
   return *this;
 }
 
+// A copy, as Weak::getValue makes: a Local handed back to the engine has its value moved out (moveHermes),
+// which would leave a shared Global holding undefined.
 template <typename T>
 Local<T> Global<T>::get() const {
   if (isEmpty()) throw Exception("get on empty Global");
-  return Local<T>(val_);
+  return converter::Converter<Local<T>>::toCpp(Local<Value>(*val_.valuePtr));
 }
 
 template <typename T>
 Local<Value> Global<T>::getValue() const {
   if (isEmpty()) return {};
-  return Local<Value>(val_);
+  return Local<Value>(*val_.valuePtr);
 }
 
 template <typename T>
