@@ -122,21 +122,21 @@ Local<Value> HermesEngine::evalInPlace(const std::string& script, const std::str
   return evalInPlaceInternal(std::make_unique<facebook::jsi::StringBuffer>(script), sourceFile);
 }
 
-struct RawDataBuffer : public facebook::jsi::Buffer {
-  RawDataBuffer(const uint8_t* data, size_t size)
-    : _data (data),
-      _size (size)
+// Hermes keeps the buffer of a bytecode module (lazy functions, string table, debug info) for as long as the
+// module lives, through this shared_ptr, so the bytes must belong to the buffer, not the caller.
+struct OwnedDataBuffer : public facebook::jsi::Buffer {
+  OwnedDataBuffer(const uint8_t* data, size_t size)
+    : bytes (data, data + size)
   {}
 
-  virtual size_t size() const { return _size; }
-  virtual const uint8_t* data() const { return _data; }
+  size_t size() const override { return bytes.size(); }
+  const uint8_t* data() const override { return bytes.data(); }
 
-  const uint8_t* _data = nullptr;
-  const size_t _size = 0;
+  const std::vector<uint8_t> bytes;
 };
 
 Local<Value> HermesEngine::evalInPlace(const char* data, size_t size, const std::string& sourceFile) {
-  return evalInPlaceInternal(std::make_unique<RawDataBuffer>(reinterpret_cast<const uint8_t*> (data), size), sourceFile);
+  return evalInPlaceInternal(std::make_shared<OwnedDataBuffer>(reinterpret_cast<const uint8_t*> (data), size), sourceFile);
 }
 
 Local<Value> HermesEngine::evalInPlaceInternal(const std::shared_ptr<facebook::jsi::Buffer>& buffer, const std::string& sourceFile) {
