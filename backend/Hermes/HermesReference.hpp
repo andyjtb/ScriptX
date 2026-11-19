@@ -75,9 +75,13 @@ Global<T>::~Global() {
   hermes_backend::BookKeep::remove(this);
 }
 
+// Assigning an empty Global resets instead: the bookkeeping is reached through engine_, which the
+// assignment would clear before afterCopy/afterMove could remove this Global's entry.
 template <typename T>
 Global<T>& Global<T>::operator=(const script::Global<T>& assign) {
-  if (this != &assign) {
+  if (assign.isEmpty()) {
+    reset();
+  } else if (this != &assign) {
     bool wasEmpty = isEmpty();
     val_ = assign.val_;
     hermes_backend::BookKeep::afterCopy(wasEmpty, this, &assign);
@@ -87,7 +91,9 @@ Global<T>& Global<T>::operator=(const script::Global<T>& assign) {
 
 template <typename T>
 Global<T>& Global<T>::operator=(script::Global<T>&& move) noexcept {
-  if (this != &move) {
+  if (move.isEmpty()) {
+    reset();
+  } else if (this != &move) {
     bool wasEmpty = isEmpty();
     val_ = std::move(move.val_);
     hermes_backend::BookKeep::afterMove(wasEmpty, this, &move);
