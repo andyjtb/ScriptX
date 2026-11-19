@@ -243,7 +243,17 @@ int32_t MessageQueue::postMessage(Message* msg, int64_t delayNanos) {
   }
   queueNotEmptyCondition_.notify_all();
 
+  {
+    std::lock_guard<std::mutex> lk(postListenerMutex_);
+    if (postListener_) postListener_();
+  }
+
   return id;
+}
+
+void MessageQueue::setPostListener(std::function<void()> listener) {
+  std::lock_guard<std::mutex> lk(postListenerMutex_);
+  postListener_ = std::move(listener);
 }
 
 std::deque<Message*>::const_iterator MessageQueue::findInsertPositionLocked(

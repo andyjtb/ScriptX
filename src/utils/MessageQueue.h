@@ -234,6 +234,9 @@ class MessageQueue {
 
   std::shared_ptr<Supervisor> supervisor_;
 
+  std::mutex postListenerMutex_;
+  std::function<void()> postListener_;
+
   static constexpr std::size_t kDefaultPoolSize = 64;
 
   friend class Message;
@@ -337,6 +340,14 @@ class MessageQueue {
    * (both before handling and after handing)
    */
   void setSupervisor(const std::shared_ptr<Supervisor>& supervisor);
+
+  /**
+   * @param listener called after every post, on the posting thread and outside the queue's lock, so
+   * an embedder looping the queue from its own event loop can schedule a loop only when there is
+   * work. Pass nullptr to stop: this waits for a call in progress, so the old listener is never
+   * called once it returns. The listener must not post or set a listener itself.
+   */
+  void setPostListener(std::function<void()> listener);
 
   /**
    * @param delay a std::chrono::duration type like milliseconds nanoseconds
