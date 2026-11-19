@@ -79,6 +79,10 @@ class HermesEngine : public ScriptEngine {
 
   std::shared_ptr<utils::MessageQueue> messageQueue() override;
 
+  // Keeps value alive until the embedder next loops the message queue, so C++ can hand a newly
+  // constructed object to script before script alone owns it.
+  void extendLifeTimeToNextLoop(std::shared_ptr<facebook::jsi::Value> value);
+
   size_t getHeapSize() override;
   void gc() override;
 

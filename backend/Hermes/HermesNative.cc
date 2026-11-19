@@ -68,10 +68,9 @@ void ScriptClass::performConstructFromCpp(void* derivedPtr, internal::TypeIndex 
   auto thiz = hermes_interop::makeLocal<Value>(std::move(jsiObj));
   auto obj = engine->performNewNativeClass(typeIndex, classDefine, 1, &thiz);
 
-  if (obj == thiz)
-    internalState_.weakRef_ = hermes_interop::toShared(thiz);
-  else
-    internalState_.weakRef_ = hermes_interop::toShared(obj);
+  // Script owns the instance through its native state, and the constructor recorded it weakly, as for
+  // a `new` from script; the strong reference only lasts until the caller has handed it to script.
+  engine->extendLifeTimeToNextLoop(hermes_interop::toShared(obj));
 }
 
 hermes_backend::HermesScriptClassState::HermesScriptClassState(HermesEngine* scriptEngine,
@@ -83,9 +82,6 @@ ScriptClass::ScriptClass(const script::Local<script::Object>& scriptObject)
 
 Local<Object> ScriptClass::getScriptObject() const {
   auto* runtime = hermes_interop::getEngineRuntime(internalState_.scriptEngine_);
-
-  if (auto val = internalState_.weakRef_)
-    return hermes_interop::makeLocal<Object>(val->asObject(*runtime));
 
   if (auto& weak = internalState_.scriptOwnedRef_) {
     auto val = weak->lock(*runtime);
@@ -108,8 +104,6 @@ Local<Array> ScriptClass::getInternalStore() const {
 ScriptEngine* ScriptClass::getScriptEngine() const { return internalState_.scriptEngine_; }
 
 bool ScriptClass::isScriptObjectNull() const {
-  if (auto val = internalState_.weakRef_) return val->isNull();
-
   if (auto& weak = internalState_.scriptOwnedRef_) {
     auto* runtime = hermes_interop::getEngineRuntime(internalState_.scriptEngine_);
     return !weak->lock(*runtime).isObject();

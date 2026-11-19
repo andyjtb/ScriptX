@@ -162,6 +162,13 @@ Local<Value> HermesEngine::evalInPlaceInternal(const std::shared_ptr<facebook::j
 
 std::shared_ptr<utils::MessageQueue> HermesEngine::messageQueue() { return messageQueue_; }
 
+void HermesEngine::extendLifeTimeToNextLoop(std::shared_ptr<facebook::jsi::Value> value) {
+  auto msg = messageQueue_->obtainInplaceMessage([](utils::InplaceMessage&) {});
+  msg->inplaceObject<std::shared_ptr<facebook::jsi::Value>>(std::move(value));
+  msg->tag = this;
+  messageQueue_->postMessage(msg);
+}
+
 size_t HermesEngine::getHeapSize() {
   const auto info = runtime_->instrumentation().getHeapInfo(false);
   return info.at("hermes_heapSize");
