@@ -69,6 +69,7 @@ void HermesEngine::destroy() noexcept {
 
   globalWeakBookkeeping_.clear();
   classRegistry_.clear();
+  isReleasingRuntime_ = true;
   internalStores_.reset();
 
   invalidatePropNameCache = nullptr;

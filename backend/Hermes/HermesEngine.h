@@ -35,6 +35,8 @@ struct SharedScriptClassHolder;
 class HermesEngine : public ScriptEngine {
  private:
   bool isDestroying_ = false;
+  // From here to the engine's deletion nothing may reach into the runtime, which is being deleted.
+  bool isReleasingRuntime_ = false;
   std::atomic_bool tickScheduled_ = false;
 
  protected:
@@ -71,6 +73,8 @@ class HermesEngine : public ScriptEngine {
   void destroy() noexcept override;
 
   bool isDestroying() const override;
+
+  bool isReleasingRuntime() const { return isReleasingRuntime_; }
 
   Local<Object> getGlobal();
 

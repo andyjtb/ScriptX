@@ -96,6 +96,10 @@ facebook::jsi::Value lockScriptObject(const hermes_backend::HermesScriptClassSta
 }  // namespace
 
 Local<Object> ScriptClass::getScriptObject() const {
+  if (internalState_.scriptEngine_->isReleasingRuntime()) {
+    throw EngineDestroyedError("getScriptObject while the script engine is destroyed");
+  }
+
   auto object = lockScriptObject(internalState_);
   if (object.isObject()) return hermes_interop::makeLocal<Object>(std::move(object));
 
@@ -104,11 +108,16 @@ Local<Object> ScriptClass::getScriptObject() const {
 
 Local<Array> ScriptClass::getInternalStore() const {
   auto* engine = internalState_.scriptEngine_;
+
+  if (engine->isReleasingRuntime()) {
+    throw InternalStoreUnavailable("getInternalStore while the script engine is destroyed");
+  }
+
   auto& runtime = *hermes_interop::getEngineRuntime(engine);
   auto object = lockScriptObject(internalState_);
 
   if (!object.isObject()) {
-    throw Exception("can't getInternalStore once the script object is collected");
+    throw InternalStoreUnavailable("getInternalStore once the script object is collected");
   }
 
   if (auto& cached = internalState_.internalStoreRef_) {
@@ -139,7 +148,8 @@ Local<Array> ScriptClass::getInternalStore() const {
 ScriptEngine* ScriptClass::getScriptEngine() const { return internalState_.scriptEngine_; }
 
 bool ScriptClass::isScriptObjectNull() const {
-  return !lockScriptObject(internalState_).isObject();
+  return internalState_.scriptEngine_->isReleasingRuntime() ||
+         !lockScriptObject(internalState_).isObject();
 }
 
 ScriptClass::~ScriptClass() = default;

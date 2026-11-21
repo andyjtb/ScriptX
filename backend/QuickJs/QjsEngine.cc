@@ -197,6 +197,7 @@ QjsEngine::~QjsEngine() = default;
 
 void QjsEngine::destroy() noexcept {
   isDestroying_ = true;
+  isReleasingRuntime_ = true;
   ScriptEngine::destroyUserData();
 
   globalWeakBookkeeping_.clear();

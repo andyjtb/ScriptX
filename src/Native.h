@@ -18,6 +18,7 @@
 #pragma once
 
 #include <cstddef>
+#include <stdexcept>
 #include <string>
 #include <typeinfo>
 #include <vector>
@@ -256,6 +257,26 @@ class ScriptClass {
 };
 
 /**
+ * Thrown by ScriptClass::getScriptObject while the engine's runtime is freed, when nothing may
+ * reach into it, not even to build a script::Exception.
+ */
+class EngineDestroyedError : public std::logic_error {
+ public:
+  using std::logic_error::logic_error;
+};
+
+/**
+ * Thrown by ScriptClass::getInternalStore where the store cannot be reached: the script object is
+ * collected, so no script can see the store again, or the engine's runtime is being freed.
+ * Building one then would allocate in the runtime, which a QuickJS finalizer must not: the
+ * allocation can start a collection inside the one running it.
+ */
+class InternalStoreUnavailable : public std::logic_error {
+ public:
+  using std::logic_error::logic_error;
+};
+
+/**
  * helper class to holder an internal store value for you
  *
  * \code
@@ -285,9 +306,21 @@ class InternalStoreHelper {
 
   SCRIPTX_DISALLOW_COPY_AND_MOVE(InternalStoreHelper);
 
-  Local<Value> get() const { return scriptClass_->getInternalStore().get(index_); }
+  // Where the store is unavailable no script can see it: reads are empty and writes do nothing.
+  Local<Value> get() const {
+    try {
+      return scriptClass_->getInternalStore().get(index_);
+    } catch (const InternalStoreUnavailable&) {
+      return {};
+    }
+  }
 
-  void set(const Local<Value>& value) const { scriptClass_->getInternalStore().set(index_, value); }
+  void set(const Local<Value>& value) const {
+    try {
+      scriptClass_->getInternalStore().set(index_, value);
+    } catch (const InternalStoreUnavailable&) {
+    }
+  }
 
   /**
    * @param value any thing supported by the type converter

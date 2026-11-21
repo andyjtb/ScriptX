@@ -53,6 +53,10 @@ ScriptClass::ScriptClass(const script::Local<script::Object>& scriptObject) : in
 }
 
 Local<Object> ScriptClass::getScriptObject() const {
+  if (internalState_.engine->isReleasingRuntime()) {
+    throw EngineDestroyedError("getScriptObject while the script engine is destroyed");
+  }
+
   if (JS_IsObject(internalState_.weakRef_)) {
     return qjs_interop::makeLocal<Object>(
         qjs_backend::dupValue(internalState_.weakRef_, internalState_.engine->context_));
@@ -63,6 +67,10 @@ Local<Object> ScriptClass::getScriptObject() const {
 Local<Array> ScriptClass::getInternalStore() const {
   auto& engine = *internalState_.engine;
 
+  if (engine.isReleasingRuntime()) {
+    throw InternalStoreUnavailable("getInternalStore while the script engine is destroyed");
+  }
+
   auto context = engine.context_;
   auto object = internalState_.weakRef_;
   auto opaque = JS_IsObject(object) ? static_cast<qjs_backend::InstanceClassOpaque*>(JS_GetOpaque(
@@ -70,7 +78,7 @@ Local<Array> ScriptClass::getInternalStore() const {
                                     : nullptr;
 
   if (opaque == nullptr) {
-    throw Exception("can't getInternalStore once the script object is collected");
+    throw InternalStoreUnavailable("getInternalStore once the script object is collected");
   }
 
   if (!JS_IsObject(opaque->internalStore)) {
@@ -108,7 +116,7 @@ ScriptEngine* ScriptClass::getScriptEngine() const { return internalState_.engin
 ScriptClass::~ScriptClass() = default;
 
 bool ScriptClass::isScriptObjectNull() const {
-  return !JS_IsObject(internalState_.weakRef_);
+  return internalState_.engine->isReleasingRuntime() || !JS_IsObject(internalState_.weakRef_);
 }
 
 }  // namespace script

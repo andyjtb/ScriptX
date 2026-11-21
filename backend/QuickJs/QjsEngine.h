@@ -54,6 +54,9 @@ class QjsEngine : public ScriptEngine {
   // state
   int pauseGcCount_ = 0;
   bool isDestroying_ = false;
+  // From here to the engine's deletion nothing may reach into the runtime: destroy() frees it with
+  // no EngineScope, so even a Local's destructor there throws.
+  bool isReleasingRuntime_ = false;
   std::atomic_bool tickScheduled_ = false;
 
   /**
@@ -91,6 +94,8 @@ class QjsEngine : public ScriptEngine {
   void destroy() noexcept override;
 
   bool isDestroying() const override;
+
+  bool isReleasingRuntime() const { return isReleasingRuntime_; }
 
   Local<Value> get(const Local<String>& key) override;
 
