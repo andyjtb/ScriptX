@@ -70,6 +70,9 @@ class QjsEngine : public ScriptEngine {
   JSValue helperFunctionIsByteBuffer_ = {};
   JSValue helperFunctionGetByteBufferInfo_ = {};
   JSAtom helperSymbolInternalStore_ = JS_ATOM_NULL;
+  // Captured at start, so script replacing WeakRef cannot reach a script::Weak.
+  JSValue helperWeakRefConstructor_ = {};
+  JSValue helperWeakRefDeref_ = {};
 
  public:
   using QjsFactory = std::function<std::pair<JSRuntime*, JSContext*>()>;

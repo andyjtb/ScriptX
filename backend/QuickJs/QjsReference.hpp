@@ -194,20 +194,20 @@ Weak<T>::~Weak() {
 
 template <typename T>
 Weak<T>::Weak(const script::Local<T>& localReference) : val_() {
+  auto& engine = qjs_backend::currentEngine();
   auto ref = qjs_interop::peekLocal(localReference);
-  val_.engine_ = &qjs_backend::currentEngine();
 
-  // if has our patch, use the real WeakRef impl.
-#ifdef QUICK_JS_HAS_SCRIPTX_PATCH
+  // Script can reference only an object weakly; any other value is held strongly. An object in a
+  // cycle is released only when the cycle collector runs.
   if (JS_IsObject(ref)) {
-    val_.ref_ = JS_NewWeakRef(val_.engine_->context_, ref);
-    qjs_backend::checkException(val_.ref_);
-    qjs_backend::BookKeep::keep(this);
-    return;
+    ref = JS_CallConstructor(engine.context_, engine.helperWeakRefConstructor_, 1, &ref);
+    qjs_backend::checkException(ref);
+  } else {
+    ref = qjs_backend::dupValue(ref, engine.context_);
   }
-#endif
 
-  val_.ref_ = qjs_backend::dupValue(ref, val_.engine_->context_);
+  val_.ref_ = ref;
+  val_.engine_ = &engine;
   qjs_backend::BookKeep::keep(this);
 }
 
@@ -267,13 +267,12 @@ Local<T> Weak<T>::get() const {
 template <typename T>
 Local<Value> Weak<T>::getValue() const {
   if (isEmpty()) return {};
-#ifdef QUICK_JS_HAS_SCRIPTX_PATCH
   if (JS_IsObject(val_.ref_)) {
-    auto ref = JS_GetWeakRef(val_.engine_->context_, val_.ref_);
-    qjs_backend::checkException(ref);
-    return qjs_interop::makeLocal<Value>(ref);
+    auto target =
+        JS_Call(val_.engine_->context_, val_.engine_->helperWeakRefDeref_, val_.ref_, 0, nullptr);
+    qjs_backend::checkException(target);
+    return qjs_interop::makeLocal<Value>(target);
   }
-#endif
   return qjs_interop::makeLocal<Value>(qjs_backend::dupValue(val_.ref_, val_.engine_->context_));
 }
 

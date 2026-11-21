@@ -177,6 +177,19 @@ void QjsEngine::initEngineResource() {
       assert(atom != JS_ATOM_NULL);
       helperSymbolInternalStore_ = atom;
     }
+
+    {
+      auto global = JS_GetGlobalObject(context_);
+      helperWeakRefConstructor_ = JS_GetPropertyStr(context_, global, "WeakRef");
+      JS_FreeValue(context_, global);
+      qjs_backend::checkException(helperWeakRefConstructor_);
+
+      auto prototype = JS_GetPropertyStr(context_, helperWeakRefConstructor_, "prototype");
+      qjs_backend::checkException(prototype);
+      helperWeakRefDeref_ = JS_GetPropertyStr(context_, prototype, "deref");
+      JS_FreeValue(context_, prototype);
+      qjs_backend::checkException(helperWeakRefDeref_);
+    }
   }
 }
 
@@ -194,6 +207,8 @@ void QjsEngine::destroy() noexcept {
   JS_FreeValue(context_, helperFunctionIsByteBuffer_);
   JS_FreeValue(context_, helperFunctionGetByteBufferInfo_);
   JS_FreeAtom(context_, helperSymbolInternalStore_);
+  JS_FreeValue(context_, helperWeakRefConstructor_);
+  JS_FreeValue(context_, helperWeakRefDeref_);
 
   for (auto&& [key, v] : nativeInstanceRegistry_) {
     JS_FreeValue(context_, v.first);
