@@ -89,8 +89,12 @@ struct hermes_interop {
   static std::shared_ptr<facebook::jsi::Value> toShared(const Local<Value>& val) {
     return val.val_.valuePtr;
   }
-  static facebook::jsi::Value&& moveHermes(const Local<Value>& val) {
-    return std::move(*val.val_.valuePtr.get());
+  // A Local's copies share one Value: it is moved out only from the last of them, so the others
+  // keep it.
+  static facebook::jsi::Value moveHermes(const Local<Value>& val) {
+    auto& shared = val.val_.valuePtr;
+    if (shared.use_count() == 1) return std::move(*shared);
+    return facebook::jsi::Value(*hermes_backend::currentRuntime(), *shared);
   }
 
   static std::vector<facebook::jsi::Value> toJsiVector(const Local<Value>* args, size_t size) {

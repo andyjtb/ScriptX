@@ -50,8 +50,14 @@ Global<T>::Global() noexcept : val_() {}
 
 template <typename T>
 Global<T>::Global(const script::Local<T>& localReference) : val_() {
-  val_.valuePtr = localReference.val_.valuePtr;
   val_.engine_ = hermes_backend::currentEngine();
+  // A moved-from Local holds no Value: the Global then holds undefined, as on QuickJS.
+  if (auto& value = localReference.val_.valuePtr) {
+    val_.valuePtr = std::make_shared<facebook::jsi::Value>(
+        *hermes_interop::getEngineRuntime(val_.engine_), *value);
+  } else {
+    val_.valuePtr = std::make_shared<facebook::jsi::Value>();
+  }
   hermes_backend::BookKeep::keep(this);
 }
 
@@ -110,8 +116,6 @@ Global<T>& Global<T>::operator=(const script::Local<T>& assign) {
   return *this;
 }
 
-// A copy, as Weak::getValue makes: a Local handed back to the engine has its value moved out (moveHermes),
-// which would leave a shared Global holding undefined.
 template <typename T>
 Local<T> Global<T>::get() const {
   if (isEmpty()) throw Exception("get on empty Global");

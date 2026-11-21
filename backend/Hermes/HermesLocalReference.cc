@@ -331,17 +331,16 @@ size_t Local<Array>::size() const {
 
 Local<Value> Local<Array>::get(size_t index) const {
   auto& runtime = *hermes_backend::currentRuntime();
-  auto result = val_.valuePtr->asObject(runtime).asArray(runtime).getValueAtIndex(runtime, index);
-  return hermes_interop::makeLocal<Value>(std::move(result));
+  // A read past the end is undefined, as in script; JSI's getValueAtIndex throws a JSError instead.
+  return hermes_interop::makeLocal<Value>(val_.valuePtr->getObject(runtime).getProperty(
+      runtime, facebook::jsi::Value(static_cast<double>(index))));
 }
 
 void Local<Array>::set(size_t index, const script::Local<script::Value>& value) const {
   auto& runtime = *hermes_backend::currentRuntime();
-  if ((int)index > (int)size() - 1)
-    val_.valuePtr->asObject(runtime).asArray(runtime).setLength(runtime, index + 1);
-
-  val_.valuePtr->asObject(runtime).asArray(runtime).setValueAtIndex(
-      runtime, index, std::move(*value.val_.valuePtr));
+  // An index past the end extends the array, as in script.
+  val_.valuePtr->getObject(runtime).setProperty(
+      runtime, facebook::jsi::Value(static_cast<double>(index)), *value.val_.valuePtr);
 }
 
 void Local<Array>::add(const script::Local<script::Value>& value) const {
