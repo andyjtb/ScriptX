@@ -109,7 +109,7 @@ ScriptEngine* ScriptClass::getScriptEngine() const { return internalState_.engin
 ScriptClass::~ScriptClass() = default;
 
 bool ScriptClass::isScriptObjectNull() const {
-  return JS_IsNull(internalState_.weakRef_);
+  return !JS_IsObject(internalState_.weakRef_);
 }
 
 }  // namespace script

@@ -80,15 +80,22 @@ hermes_backend::HermesScriptClassState::HermesScriptClassState(HermesEngine* scr
 ScriptClass::ScriptClass(const script::Local<script::Object>& scriptObject)
     : internalState_(hermes_backend::currentEngine(), scriptObject) {}
 
-Local<Object> ScriptClass::getScriptObject() const {
-  auto* runtime = hermes_interop::getEngineRuntime(internalState_.scriptEngine_);
+namespace {
 
-  if (auto& weak = internalState_.scriptOwnedRef_) {
-    auto val = weak->lock(*runtime);
-    if (val.isObject()) return hermes_interop::makeLocal<Object>(val.asObject(*runtime));
+facebook::jsi::Value lockScriptObject(const hermes_backend::HermesScriptClassState& state) {
+  if (auto& weak = state.scriptOwnedRef_) {
+    return weak->lock(*hermes_interop::getEngineRuntime(state.scriptEngine_));
   }
+  return {};
+}
 
-  return Object::newObject();
+}  // namespace
+
+Local<Object> ScriptClass::getScriptObject() const {
+  auto object = lockScriptObject(internalState_);
+  if (object.isObject()) return hermes_interop::makeLocal<Object>(std::move(object));
+
+  throw Exception("can't getScriptObject once it has been collected");
 }
 
 Local<Array> ScriptClass::getInternalStore() const {
@@ -104,12 +111,7 @@ Local<Array> ScriptClass::getInternalStore() const {
 ScriptEngine* ScriptClass::getScriptEngine() const { return internalState_.scriptEngine_; }
 
 bool ScriptClass::isScriptObjectNull() const {
-  if (auto& weak = internalState_.scriptOwnedRef_) {
-    auto* runtime = hermes_interop::getEngineRuntime(internalState_.scriptEngine_);
-    return !weak->lock(*runtime).isObject();
-  }
-
-  return true;
+  return !lockScriptObject(internalState_).isObject();
 }
 
 ScriptClass::~ScriptClass() = default;
