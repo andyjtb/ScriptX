@@ -18,7 +18,9 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
+#include <variant>
 #include "../../src/types.h"
 #include "../../src/utils/GlobalWeakBookkeeping.hpp"
 
@@ -97,24 +99,25 @@ class GlobalValueHolder : public ValueHolder {
 class WeakValueHolder {
  public:
   WeakValueHolder() {}
-  WeakValueHolder(const WeakValueHolder& other)
-      : valuePtr(other.valuePtr), engine_(other.engine_) {}
-  WeakValueHolder(const std::shared_ptr<facebook::jsi::Value>& val) : valuePtr(val) {}
+  WeakValueHolder(const WeakValueHolder& other) : target(other.target), engine_(other.engine_) {}
 
   WeakValueHolder& operator=(const WeakValueHolder& assign) {
-    valuePtr = assign.valuePtr;
+    target = assign.target;
     engine_ = assign.engine_;
     return *this;
   }
 
   WeakValueHolder& operator=(WeakValueHolder&& move) noexcept {
-    valuePtr = std::move(move.valuePtr);
+    target = std::move(move.target);
     engine_ = move.engine_;
     move.engine_ = nullptr;
     return *this;
   }
 
-  std::weak_ptr<facebook::jsi::Value> valuePtr;
+  // JSI can reference only an Object weakly; any other value is held strongly.
+  std::variant<std::monostate, std::shared_ptr<facebook::jsi::WeakObject>,
+               std::shared_ptr<facebook::jsi::Value>>
+      target;
   hermes_backend::HermesEngine* engine_ = nullptr;
   internal::GlobalWeakBookkeeping::HandleType handle_{};
 };

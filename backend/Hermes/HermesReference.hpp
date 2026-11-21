@@ -154,8 +154,16 @@ Weak<T>::~Weak() {
 
 template <typename T>
 Weak<T>::Weak(const script::Local<T>& localReference) : val_() {
-  if (auto shared = hermes_interop::toShared(localReference)) val_.valuePtr = shared;
   val_.engine_ = hermes_backend::currentEngine();
+  if (auto shared = hermes_interop::toShared(localReference)) {
+    auto& runtime = *hermes_interop::getEngineRuntime(val_.engine_);
+    if (shared->isObject()) {
+      val_.target =
+          std::make_shared<facebook::jsi::WeakObject>(runtime, shared->asObject(runtime));
+    } else {
+      val_.target = std::make_shared<facebook::jsi::Value>(runtime, *shared);
+    }
+  }
   hermes_backend::BookKeep::keep(this);
 }
 
@@ -196,7 +204,7 @@ Weak<T>& Weak<T>::operator=(script::Weak<T>&& move) noexcept {
 template <typename T>
 void Weak<T>::swap(Weak& rhs) noexcept {
   if (&rhs != this) {
-    std::swap(val_.valuePtr, rhs.val_.valuePtr);
+    std::swap(val_.target, rhs.val_.target);
     std::swap(val_.engine_, rhs.val_.engine_);
     hermes_backend::BookKeep::afterSwap(this, &rhs);
   }
@@ -218,7 +226,13 @@ Local<T> Weak<T>::get() const {
 template <typename T>
 Local<Value> Weak<T>::getValue() const {
   if (isEmpty()) return {};
-  if (auto shared = val_.valuePtr.lock(); shared != nullptr) return Local<Value>(*shared);
+  auto& runtime = *hermes_interop::getEngineRuntime(val_.engine_);
+  if (auto object = std::get_if<std::shared_ptr<facebook::jsi::WeakObject>>(&val_.target)) {
+    return hermes_interop::makeLocal<Value>((*object)->lock(runtime));
+  }
+  if (auto value = std::get_if<std::shared_ptr<facebook::jsi::Value>>(&val_.target)) {
+    return hermes_interop::makeLocal<Value>(facebook::jsi::Value(runtime, **value));
+  }
   return {};
 }
 
@@ -230,7 +244,7 @@ bool Weak<T>::isEmpty() const {
 template <typename T>
 void Weak<T>::reset() noexcept {
   if (isEmpty()) return;
-  val_.valuePtr.reset();
+  val_.target = std::monostate{};
   hermes_backend::BookKeep::remove(this);
   val_.engine_ = nullptr;
 }
