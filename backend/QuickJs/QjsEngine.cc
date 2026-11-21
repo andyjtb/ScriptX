@@ -199,8 +199,8 @@ void QjsEngine::destroy() noexcept {
   isDestroying_ = true;
   ScriptEngine::destroyUserData();
 
-  queue_->removeMessageByTag(static_cast<ScriptEngine*>(this));
   globalWeakBookkeeping_.clear();
+  queue_->removeMessageByTag(static_cast<ScriptEngine*>(this));
 
   JS_FreeAtom(context_, lengthAtom_);
   JS_FreeValue(context_, helperFunctionStrictEqual_);

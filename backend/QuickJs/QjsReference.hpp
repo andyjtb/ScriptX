@@ -89,10 +89,17 @@ inline void GlobalRefState::swap(GlobalRefState& other) {
 
 template <typename GlobalOrWeak>
 void GlobalRefState::dtor(GlobalOrWeak* thiz) {
-  if (!isEmpty()) {
-    EngineScope scope(engine_);
+  if (isEmpty()) return;
+
+  // EngineScope refuses a destroying engine, whose teardown frees objects and so their members;
+  // reset frees through the engine's context, which outlives every such free.
+  if (engine_->isDestroying()) {
     reset(thiz);
+    return;
   }
+
+  EngineScope scope(engine_);
+  reset(thiz);
 }
 
 }  // namespace qjs_backend
