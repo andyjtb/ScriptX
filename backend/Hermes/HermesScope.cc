@@ -27,7 +27,7 @@ HermesEngineScope::HermesEngineScope(HermesEngine& engine, HermesEngine* previou
     : scope_(*engine.runtime_), engine_(engine) {}
 
 HermesEngineScope::~HermesEngineScope() {
-  engine_.getRt().drainMicrotasks(-1);
+  if (engine_.runsJobs()) engine_.getRt().drainMicrotasks(-1);
 }
 
 }  // namespace script::hermes_backend

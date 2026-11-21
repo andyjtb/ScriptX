@@ -224,14 +224,14 @@ void QjsEngine::destroy() noexcept {
 
 void QjsEngine::triggerTick() {
   bool no = false;
-  if (!isDestroying() && JS_IsJobPending(runtime_) &&
+  if (!isDestroying() && runsJobs() && JS_IsJobPending(runtime_) &&
       tickScheduled_.compare_exchange_strong(no, true)) {
     utils::Message tick(
         [](auto& m) {
           auto eng = static_cast<QjsEngine*>(m.ptr0);
           JSContext* ctx = nullptr;
           EngineScope scope(eng);
-          while (JS_ExecutePendingJob(eng->runtime_, &ctx) > 0) {
+          while (eng->runsJobs() && JS_ExecutePendingJob(eng->runtime_, &ctx) > 0) {
           }
           eng->tickScheduled_ = false;
         },
@@ -294,7 +294,7 @@ Local<Value> QjsEngine::eval(const Local<String>& script, const Local<Value>& so
   qjs_backend::checkException(ret);
 
   JSContext* ctx;
-  while (JS_ExecutePendingJob(runtime_, &ctx) > 0) {
+  while (runsJobs() && JS_ExecutePendingJob(runtime_, &ctx) > 0) {
   }
 
 

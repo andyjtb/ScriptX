@@ -66,7 +66,6 @@ void HermesEngine::destroy() noexcept {
   isDestroying_ = true;
   ScriptEngine::destroyUserData();
   messageQueue_->removeMessageByTag(this);
-  runtime_->drainMicrotasks(-1);
 
   globalWeakBookkeeping_.clear();
   classRegistry_.clear();
@@ -119,7 +118,7 @@ Local<Value> HermesEngine::eval(const Local<String>& script, const Local<Value>&
     throw Exception(msg);
   }
 
-  runtime_->drainMicrotasks(-1);
+  if (runsJobs()) runtime_->drainMicrotasks(-1);
   return Local<Value>(std::move(ret));
 }
 
@@ -165,7 +164,7 @@ Local<Value> HermesEngine::evalInPlaceInternal(const std::shared_ptr<facebook::j
     throw Exception(msg);
   }
 
-  runtime_->drainMicrotasks(-1);
+  if (runsJobs()) runtime_->drainMicrotasks(-1);
   return Local<Value>(std::move(ret));
 }
 
@@ -210,8 +209,7 @@ void HermesEngine::scheduleTick() {
         [](auto& m) {
           auto eng = static_cast<HermesEngine*>(m.ptr0);
           EngineScope scope(eng);
-          ;
-          while (!eng->runtime_->drainMicrotasks(-1)) {
+          while (eng->runsJobs() && !eng->runtime_->drainMicrotasks(-1)) {
           }
           eng->tickScheduled_ = false;
         },

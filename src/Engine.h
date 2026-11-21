@@ -67,6 +67,17 @@ class ScriptEngine {
    */
   virtual bool isDestroying() const = 0;
 
+  /**
+   * Stops this engine running its pending promise jobs, for good: the close of its outermost
+   * EngineScope and its own ticks leave them unrun, as destroy() always does. For an engine its
+   * embedder has dropped, so that none of its old script runs again.
+   *
+   * note: JavaScriptCore runs its jobs itself as each evaluation returns, so this cannot stop them.
+   */
+  void stopRunningJobs() { runsJobs_ = false; }
+
+  bool runsJobs() const { return runsJobs_; }
+
   SCRIPTX_DISALLOW_COPY_AND_MOVE(ScriptEngine);
 
   /**
@@ -254,6 +265,8 @@ class ScriptEngine {
 
   // non-template version of ClassDefine related api
  private:
+  bool runsJobs_ = true;
+
   void registerNativeClassInternal(
       internal::TypeIndex typeIndex, const internal::ClassDefineState* classDefine,
       ScriptClass* (*instanceTypeToScriptClass)(void* instancePointer));
