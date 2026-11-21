@@ -198,12 +198,12 @@ class ScriptClass {
   template <typename T>
   T* getScriptEngineAs() const;
 
- protected:
   /**
    * Get the internal storage array, this array is only viable by C++ api (not script api).
    */
   Local<Array> getInternalStore() const;
 
+ protected:
   /**
    * Be CAREFUL when overriding destructor.
    *
