@@ -61,26 +61,25 @@ Local<Object> ScriptClass::getScriptObject() const {
 }
 
 Local<Array> ScriptClass::getInternalStore() const {
-  if (JS_IsObject(internalState_.weakRef_)) {
-    auto context = internalState_.engine->context_;
-    JSAtom symbol = internalState_.engine->helperSymbolInternalStore_;
-    auto obj = internalState_.weakRef_;
-    auto store = JS_GetProperty(context, obj, symbol);
-    qjs_backend::checkException(store);
-#if SCRIPTX_BACKEND_QUICKJS_NG
-    if (!JS_IsArray(store)) {
-#else
-    if (!JS_IsArray(context, store)) {
-#endif
-      JS_FreeValue(context, store);
-      store = JS_NewArray(context);
-      qjs_backend::checkException(store);
-      qjs_backend::checkException(
-          JS_SetProperty(context, obj, symbol, JS_DupValue(context, store)));
-    }
-    return qjs_interop::makeLocal<Array>(store);
+  auto& engine = *internalState_.engine;
+
+  auto context = engine.context_;
+  auto object = internalState_.weakRef_;
+  auto opaque = JS_IsObject(object) ? static_cast<qjs_backend::InstanceClassOpaque*>(JS_GetOpaque(
+                                          object, qjs_backend::QjsEngine::kInstanceClassId))
+                                    : nullptr;
+
+  if (opaque == nullptr) {
+    throw Exception("can't getInternalStore once the script object is collected");
   }
-  throw Exception("can't getScriptObject in finalizer");
+
+  if (!JS_IsObject(opaque->internalStore)) {
+    auto store = JS_NewArray(context);
+    qjs_backend::checkException(store);
+    opaque->internalStore = store;
+  }
+
+  return qjs_interop::makeLocal<Array>(JS_DupValue(context, opaque->internalStore));
 }
 
 void ScriptClass::performConstructFromCpp(void* derivedPtr, internal::TypeIndex typeIndex,

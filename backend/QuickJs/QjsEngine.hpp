@@ -24,9 +24,14 @@
 namespace script::qjs_backend {
 
 struct InstanceClassOpaque {
-  void* scriptClassPolymorphicPointer;
-  ScriptClass* scriptClassPointer;
-  const void* classDefine;
+  void* scriptClassPolymorphicPointer = nullptr;
+  // Null until the C++ constructor has returned.
+  ScriptClass* scriptClassPointer = nullptr;
+  const void* classDefine = nullptr;
+  // ScriptClass::getInternalStore's array, made on first use. Owned here and marked by the class's
+  // gc_mark, so the collector sees it as the object's child: a frozen object still has one, script
+  // never sees it, and a cycle through it is collected.
+  JSValue internalStore = JS_UNDEFINED;
 };
 
 class PauseGc {

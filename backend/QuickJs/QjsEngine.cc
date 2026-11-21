@@ -136,15 +136,23 @@ void QjsEngine::initEngineResource() {
 
   JSClassDef instance{};
   instance.class_name = "ScriptXInstance";
-  instance.finalizer = [](JSRuntime* /*rt*/, JSValue val) {
+  instance.finalizer = [](JSRuntime* rt, JSValue val) {
     auto ptr = JS_GetOpaque(val, kInstanceClassId);
     if (ptr) {
       auto opaque = static_cast<InstanceClassOpaque*>(ptr);
-      // reset the weak reference
-      PauseGc pauseGc(opaque->scriptClassPointer->internalState_.engine);
-      opaque->scriptClassPointer->internalState_.weakRef_ = JS_UNDEFINED;
-      delete opaque->scriptClassPointer;
+      if (auto scriptClass = opaque->scriptClassPointer) {
+        // reset the weak reference
+        PauseGc pauseGc(scriptClass->internalState_.engine);
+        scriptClass->internalState_.weakRef_ = JS_UNDEFINED;
+        delete scriptClass;
+      }
+      JS_FreeValueRT(rt, opaque->internalStore);
       delete opaque;
+    }
+  };
+  instance.gc_mark = [](JSRuntime* rt, JSValueConst val, JS_MarkFunc* markFunc) {
+    if (auto opaque = static_cast<InstanceClassOpaque*>(JS_GetOpaque(val, kInstanceClassId))) {
+      JS_MarkValue(rt, opaque->internalStore, markFunc);
     }
   };
   JS_NewClass(runtime_, kInstanceClassId, &instance);
@@ -168,14 +176,6 @@ void QjsEngine::initEngineResource() {
     {
       auto ret = eval(kGetByteBufferInfo);
       helperFunctionGetByteBufferInfo_ = qjs_interop::getLocal(ret);
-    }
-
-    {
-      // TODO(landerl): can we create symbol through C-API? Not yet.
-      auto ret = eval("(Symbol('ScriptX.InternalStore'))");
-      auto atom = JS_ValueToAtom(context_, qjs_interop::peekLocal(ret));
-      assert(atom != JS_ATOM_NULL);
-      helperSymbolInternalStore_ = atom;
     }
 
     {
@@ -206,7 +206,6 @@ void QjsEngine::destroy() noexcept {
   JS_FreeValue(context_, helperFunctionStrictEqual_);
   JS_FreeValue(context_, helperFunctionIsByteBuffer_);
   JS_FreeValue(context_, helperFunctionGetByteBufferInfo_);
-  JS_FreeAtom(context_, helperSymbolInternalStore_);
   JS_FreeValue(context_, helperWeakRefConstructor_);
   JS_FreeValue(context_, helperWeakRefDeref_);
 
@@ -434,6 +433,11 @@ Local<Object> QjsEngine::newConstructor(
         JS_FreeValue(engine->context_, targetProto);
         checkException(ret);
 
+        // Set before the C++ constructor runs, which may already write the internal store. Its
+        // classDefine stays null until then, so script cannot call the instance's methods on it.
+        auto opaque = new InstanceClassOpaque();
+        JS_SetOpaque(obj, opaque);
+
         void* instance = nullptr;
         if (args.size() == 1) {
           auto ptr = JS_GetOpaque(qjs_interop::peekLocal(args[0]), kPointerClassId);
@@ -456,11 +460,9 @@ Local<Object> QjsEngine::newConstructor(
           }
         }
 
-        auto opaque = new InstanceClassOpaque();
         opaque->scriptClassPolymorphicPointer = instance;
         opaque->scriptClassPointer = instanceTypeToScriptClass(instance);
         opaque->classDefine = classDefine;
-        JS_SetOpaque(obj, opaque);
 
         return qjs_interop::makeLocal<Value>(obj);
       });
