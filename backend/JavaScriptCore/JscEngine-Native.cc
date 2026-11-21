@@ -58,6 +58,8 @@ void JscEngine::defineInstance(const internal::ClassDefineState* classDefine, Lo
 
   instanceDefine.finalize = [](JSObjectRef thiz) {
     auto* t = static_cast<ScriptClass*>(JSObjectGetPrivate(thiz));
+    // A constructor that threw returns its instance without a ScriptClass.
+    if (t == nullptr) return;
     auto engine = script::internal::scriptDynamicCast<JscEngine*>(t->getScriptEngine());
     if (!engine->isDestroying()) {
       utils::Message dtor([](auto& msg) {},
@@ -129,6 +131,17 @@ JSObjectCallAsFunctionCallback JscEngine::createConstructor() {
 
     try {
       StackFrameScope stack;
+
+      // WebIDL constructors throw when called without `new`. wrapConstructor's wrapper hides
+      // new.target, so such a call shows as a `this` that is not of this class or is already a
+      // native instance.
+      if (thisObject == nullptr || registry.constructor.isEmpty() ||
+          JSObjectGetPrivate(thisObject) != nullptr ||
+          !JSValueIsInstanceOfConstructor(ctx, thisObject, registry.constructor.get().val_,
+                                          nullptr)) {
+        throw Exception("constructor can't be called as function");
+      }
+
       void* thiz;
       if (argumentCount == 2 && engine->isConstructorMarkSymbol(arguments[0]) &&
           JSValueIsObjectOfClass(engine->context_, arguments[1], externalClass_)) {
@@ -149,16 +162,7 @@ JSObjectCallAsFunctionCallback JscEngine::createConstructor() {
         JSObjectSetPrivate(object, scriptClass);
 
         // `this` carries new.target's prototype, so a JS class extending this one keeps its own.
-        // Called as a plain function, `this` is the global object and fails the instanceof.
-        const bool constructed =
-            thisObject != nullptr && !registry.constructor.isEmpty() &&
-            JSValueIsInstanceOfConstructor(ctx, thisObject, registry.constructor.get().val_,
-                                           nullptr);
-
-        JSObjectSetPrototype(ctx, object,
-                             constructed
-                                 ? JSObjectGetPrototype(ctx, thisObject)
-                                 : toJsc(engine->context_, registry.prototype.get().asValue()));
+        JSObjectSetPrototype(ctx, object, JSObjectGetPrototype(ctx, thisObject));
         return object;
       } else {
         throw Exception("constructor returns null");

@@ -114,6 +114,17 @@ Local<Object> HermesEngine::createConstructor(const internal::ClassDefineState* 
 
         ClassRegistryData& registry = it->second;
 
+        // WebIDL constructors throw when called without `new`. makeNativeClass's wrapper
+        // (03-MakeNativeClassHelper.js) hides new.target, so such a call shows as a `this` that is
+        // not of this class or is already a native instance.
+        if (!thisValue.isObject() || registry.constructor.isEmpty() ||
+            thisValue.asObject(runtime).hasNativeState(runtime) ||
+            !runtime.instanceOf(thisValue.asObject(runtime),
+                                registry.constructor.val_.valuePtr->asObject(runtime).asFunction(
+                                    runtime))) {
+          throw Exception(std::string("constructor can't be called as function"));
+        }
+
         auto scriptArgs = hermes_interop::makeArguments(engine, thisValue, arguments, count);
 
         StackFrameScope stack;
@@ -156,29 +167,6 @@ Local<Object> HermesEngine::createConstructor(const internal::ClassDefineState* 
         scriptClass->internalState_.scriptEngine_ = engine;
         scriptClass->internalState_.classDefine = classDefine;
         scriptClass->internalState_.polymorphicPointer = polymorphicPtr;
-
-        // `new` built `this` from new.target.prototype, so a JS class extending this one has its
-        // own prototype there already and keeping it is what leaves the subclass intact. Called
-        // as a plain function instead, `this` is the global object and fails the instanceof.
-        const bool constructed =
-            thisValue.isObject() && !registry.constructor.isEmpty() &&
-            runtime.instanceOf(thisValue.asObject(runtime),
-                               registry.constructor.val_.valuePtr->asObject(runtime).asFunction(
-                                   runtime));
-
-        if (!constructed && registry.prototype.val_.valuePtr != nullptr) {
-          auto Object = runtime.global().getPropertyAsObject(runtime, "Object");
-          auto createFunc = Object.getPropertyAsFunction(runtime, "create");
-
-          auto obj = createFunc.call(runtime, *registry.prototype.val_.valuePtr);
-          obj.asObject(runtime).setNativeState(
-              runtime, std::make_shared<SharedScriptClassHolder>(scriptClass));
-          // Script sees `obj`, not the constructor's `this`.
-          scriptClass->internalState_.scriptOwnedRef_ =
-              std::make_unique<facebook::jsi::WeakObject>(runtime, obj.asObject(runtime));
-
-          return obj;
-        }
 
         thisValue.asObject(runtime).setNativeState(
             runtime, std::make_shared<SharedScriptClassHolder>(scriptClass));
