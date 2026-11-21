@@ -95,32 +95,37 @@ Global<T>::~Global() {
 
 template <typename T>
 Global<T>& Global<T>::operator=(const script::Global<T>& assign) {
-  bool wasEmtpy = isEmpty();
-  if (!wasEmtpy) {
-    jsc_backend::release(val_.engine_->context_, val_.ref_);
+  if (this != &assign) {
+    bool wasEmpty = isEmpty();
+    auto bookkeeping = jsc_backend::BookKeep::beforeAssign(this, &assign);
+    if (!wasEmpty) {
+      jsc_backend::release(val_.engine_->context_, val_.ref_);
+    }
+
+    val_.ref_ = assign.val_.ref_;
+    val_.engine_ = assign.val_.engine_;
+    if (val_.ref_) jsc_backend::retain(val_.engine_->context_, val_.ref_);
+
+    jsc_backend::BookKeep::afterCopy(bookkeeping, wasEmpty, this, &assign);
   }
-
-  val_.ref_ = assign.val_.ref_;
-  val_.engine_ = assign.val_.engine_;
-  if (val_.ref_) jsc_backend::retain(val_.engine_->context_, val_.ref_);
-
-  jsc_backend::BookKeep::afterCopy(wasEmtpy, this, &assign);
   return *this;
 }
 
 template <typename T>
 Global<T>& Global<T>::operator=(script::Global<T>&& move) noexcept {
-  bool wasEmtpy = isEmpty();
-  if (!wasEmtpy) {
-    wasEmtpy = false;
-    jsc_backend::release(val_.engine_->context_, val_.ref_);
-  }
+  if (this != &move) {
+    bool wasEmpty = isEmpty();
+    auto bookkeeping = jsc_backend::BookKeep::beforeAssign(this, &move);
+    if (!wasEmpty) {
+      jsc_backend::release(val_.engine_->context_, val_.ref_);
+    }
 
-  val_.ref_ = move.val_.ref_;
-  val_.engine_ = move.val_.engine_;
-  move.val_.ref_ = nullptr;
-  move.val_.engine_ = nullptr;
-  jsc_backend::BookKeep::afterMove(wasEmtpy, this, &move);
+    val_.ref_ = move.val_.ref_;
+    val_.engine_ = move.val_.engine_;
+    move.val_.ref_ = nullptr;
+    move.val_.engine_ = nullptr;
+    jsc_backend::BookKeep::afterMove(bookkeeping, wasEmpty, this, &move);
+  }
   return *this;
 }
 
@@ -200,19 +205,25 @@ Weak<T>::Weak(script::Weak<T>&& move) noexcept : val_() {
 
 template <typename T>
 Weak<T>& Weak<T>::operator=(const script::Weak<T>& assign) {
-  bool wasEmtpy = isEmpty();
-  val_.ref_ = assign.val_.ref_;
-  val_.engine_ = assign.val_.engine_;
-  jsc_backend::BookKeep::afterCopy(wasEmtpy, this, &assign);
+  if (this != &assign) {
+    bool wasEmpty = isEmpty();
+    auto bookkeeping = jsc_backend::BookKeep::beforeAssign(this, &assign);
+    val_.ref_ = assign.val_.ref_;
+    val_.engine_ = assign.val_.engine_;
+    jsc_backend::BookKeep::afterCopy(bookkeeping, wasEmpty, this, &assign);
+  }
   return *this;
 }
 
 template <typename T>
 Weak<T>& Weak<T>::operator=(script::Weak<T>&& move) noexcept {
-  bool wasEmpty = isEmpty();
-  val_.ref_ = std::move(move.val_.ref_);
-  val_.engine_ = std::move(move.val_.engine_);
-  jsc_backend::BookKeep::afterMove(wasEmpty, this, &move);
+  if (this != &move) {
+    bool wasEmpty = isEmpty();
+    auto bookkeeping = jsc_backend::BookKeep::beforeAssign(this, &move);
+    val_.ref_ = std::move(move.val_.ref_);
+    val_.engine_ = std::move(move.val_.engine_);
+    jsc_backend::BookKeep::afterMove(bookkeeping, wasEmpty, this, &move);
+  }
   return *this;
 }
 
