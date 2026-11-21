@@ -46,7 +46,11 @@ void HermesEngine::performRegisterNativeClass(
       ::script::internal::getNamespaceObject(this, classDefine->nameSpace, getGlobal()).asObject();
   ns.set(classDefine->className, object);
 
-  classRegistry_.emplace(classDefine, registry);
+  const auto inserted = classRegistry_.emplace(classDefine, registry).second;
+  // registerNativeClassInternal refuses a type registered twice, so a define already here belongs to another class:
+  // one this engine registered was freed, and this define took its address.
+  assert(inserted && "a class define took the address of a freed one this engine registered");
+  (void)inserted;
 }
 
 void HermesEngine::defineInstance(const internal::ClassDefineState* classDefine,
