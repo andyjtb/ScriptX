@@ -156,10 +156,6 @@ Local<Object> HermesEngine::createConstructor(const internal::ClassDefineState* 
         scriptClass->internalState_.scriptEngine_ = engine;
         scriptClass->internalState_.classDefine = classDefine;
         scriptClass->internalState_.polymorphicPointer = polymorphicPtr;
-        // Keep a store the constructor already wrote to.
-        if (!scriptClass->internalState_.internalStore_.isArray())
-          scriptClass->internalState_.internalStore_ =
-              hermes_interop::makeLocal<Value>(facebook::jsi::Array(runtime, 0));
 
         // `new` built `this` from new.target.prototype, so a JS class extending this one has its
         // own prototype there already and keeping it is what leaves the subclass intact. Called
@@ -186,8 +182,11 @@ Local<Object> HermesEngine::createConstructor(const internal::ClassDefineState* 
 
         thisValue.asObject(runtime).setNativeState(
             runtime, std::make_shared<SharedScriptClassHolder>(scriptClass));
-        scriptClass->internalState_.scriptOwnedRef_ =
-            std::make_unique<facebook::jsi::WeakObject>(runtime, thisValue.asObject(runtime));
+
+        if (!scriptClass->internalState_.scriptOwnedRef_) {
+          scriptClass->internalState_.scriptOwnedRef_ =
+              std::make_unique<facebook::jsi::WeakObject>(runtime, thisValue.asObject(runtime));
+        }
 
         return {};
       });

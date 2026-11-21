@@ -35,9 +35,10 @@ struct HermesScriptClassState {
   HermesEngine* scriptEngine_ = nullptr;
   const void* classDefine = nullptr;
   void* polymorphicPointer = nullptr;
-  Local<Value> internalStore_;
   // Weak, since the script object owns the ScriptClass through its native state, however it was constructed.
   std::unique_ptr<facebook::jsi::WeakObject> scriptOwnedRef_;
+  // Weak: the engine's WeakMap keeps the store for as long as the script object lives.
+  mutable std::unique_ptr<facebook::jsi::WeakObject> internalStoreRef_;
 };
 
 struct SharedScriptClassHolder : public facebook::jsi::NativeState {

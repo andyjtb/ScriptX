@@ -45,6 +45,14 @@ HermesEngine::HermesEngine(std::shared_ptr<utils::MessageQueue> queue, const Eng
   runtime_ = std::make_unique<HermesRuntime>(std::move(runtime), 0, runtimeConfig).release();
 
   invalidatePropNameCache = std::make_unique<InvalidateCacheOnDestroy>(*runtime_);
+
+  facebook::jsi::Runtime& rt = *runtime_;
+  auto weakMap = rt.global().getPropertyAsFunction(rt, "WeakMap");
+  auto prototype = weakMap.getPropertyAsObject(rt, "prototype");
+
+  internalStores_.emplace(InternalStores{weakMap.callAsConstructor(rt).getObject(rt),
+                                         prototype.getPropertyAsFunction(rt, "get"),
+                                         prototype.getPropertyAsFunction(rt, "set")});
 }
 
 HermesEngine::HermesEngine() : HermesEngine(std::shared_ptr<utils::MessageQueue>{}) {}
@@ -62,6 +70,7 @@ void HermesEngine::destroy() noexcept {
 
   globalWeakBookkeeping_.clear();
   classRegistry_.clear();
+  internalStores_.reset();
 
   invalidatePropNameCache = nullptr;
   delete runtime_;

@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <optional>
+
 #include "../../src/Engine.h"
 #include "../../src/Exception.h"
 #include "../../src/Native.h"
@@ -48,6 +50,16 @@ class HermesEngine : public ScriptEngine {
   internal::GlobalWeakBookkeeping globalWeakBookkeeping_{};
 
   std::unordered_map<const void*, ClassRegistryData> classRegistry_;
+
+  // ScriptClass::getInternalStore's stores: a WeakMap keyed by script object, so a frozen object
+  // still has one and script never sees it. Its builtins are captured at start, before script could
+  // replace them.
+  struct InternalStores {
+    facebook::jsi::Object map;
+    facebook::jsi::Function get;
+    facebook::jsi::Function set;
+  };
+  std::optional<InternalStores> internalStores_;
 
  public:
   HermesEngine(std::shared_ptr<::script::utils::MessageQueue> queue, const EngineOptions& options = {});
