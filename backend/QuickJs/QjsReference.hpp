@@ -132,8 +132,9 @@ template <typename T>
 Global<T>& Global<T>::operator=(const script::Global<T>& assign) {
   if (this != &assign) {
     bool wasEmpty = isEmpty();
+    auto bookkeeping = qjs_backend::BookKeep::beforeAssign(this, &assign);
     val_ = assign.val_;
-    qjs_backend::BookKeep::afterCopy(wasEmpty, this, &assign);
+    qjs_backend::BookKeep::afterCopy(bookkeeping, wasEmpty, this, &assign);
   }
   return *this;
 }
@@ -142,8 +143,9 @@ template <typename T>
 Global<T>& Global<T>::operator=(script::Global<T>&& move) noexcept {
   if (this != &move) {
     bool wasEmpty = isEmpty();
+    auto bookkeeping = qjs_backend::BookKeep::beforeAssign(this, &move);
     val_ = std::move(move.val_);
-    qjs_backend::BookKeep::afterMove(wasEmpty, this, &move);
+    qjs_backend::BookKeep::afterMove(bookkeeping, wasEmpty, this, &move);
   }
   return *this;
 }
@@ -229,8 +231,9 @@ template <typename T>
 Weak<T>& Weak<T>::operator=(const script::Weak<T>& assign) {
   if (this != &assign) {
     bool wasEmpty = isEmpty();
+    auto bookkeeping = qjs_backend::BookKeep::beforeAssign(this, &assign);
     val_ = assign.val_;
-    qjs_backend::BookKeep::afterCopy(wasEmpty, this, &assign);
+    qjs_backend::BookKeep::afterCopy(bookkeeping, wasEmpty, this, &assign);
   }
   return *this;
 }
@@ -239,8 +242,9 @@ template <typename T>
 Weak<T>& Weak<T>::operator=(script::Weak<T>&& move) noexcept {
   if (this != &move) {
     bool wasEmpty = isEmpty();
+    auto bookkeeping = qjs_backend::BookKeep::beforeAssign(this, &move);
     val_ = std::move(move.val_);
-    qjs_backend::BookKeep::afterMove(wasEmpty, this, &move);
+    qjs_backend::BookKeep::afterMove(bookkeeping, wasEmpty, this, &move);
   }
   return *this;
 }

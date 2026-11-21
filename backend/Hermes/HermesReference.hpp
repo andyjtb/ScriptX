@@ -75,28 +75,24 @@ Global<T>::~Global() {
   hermes_backend::BookKeep::remove(this);
 }
 
-// Assigning an empty Global resets instead: the bookkeeping is reached through engine_, which the
-// assignment would clear before afterCopy/afterMove could remove this Global's entry.
 template <typename T>
 Global<T>& Global<T>::operator=(const script::Global<T>& assign) {
-  if (assign.isEmpty()) {
-    reset();
-  } else if (this != &assign) {
+  if (this != &assign) {
     bool wasEmpty = isEmpty();
+    auto bookkeeping = hermes_backend::BookKeep::beforeAssign(this, &assign);
     val_ = assign.val_;
-    hermes_backend::BookKeep::afterCopy(wasEmpty, this, &assign);
+    hermes_backend::BookKeep::afterCopy(bookkeeping, wasEmpty, this, &assign);
   }
   return *this;
 }
 
 template <typename T>
 Global<T>& Global<T>::operator=(script::Global<T>&& move) noexcept {
-  if (move.isEmpty()) {
-    reset();
-  } else if (this != &move) {
+  if (this != &move) {
     bool wasEmpty = isEmpty();
+    auto bookkeeping = hermes_backend::BookKeep::beforeAssign(this, &move);
     val_ = std::move(move.val_);
-    hermes_backend::BookKeep::afterMove(wasEmpty, this, &move);
+    hermes_backend::BookKeep::afterMove(bookkeeping, wasEmpty, this, &move);
   }
   return *this;
 }
@@ -185,8 +181,9 @@ template <typename T>
 Weak<T>& Weak<T>::operator=(const script::Weak<T>& assign) {
   if (this != &assign) {
     bool wasEmpty = isEmpty();
+    auto bookkeeping = hermes_backend::BookKeep::beforeAssign(this, &assign);
     val_ = assign.val_;
-    hermes_backend::BookKeep::afterCopy(wasEmpty, this, &assign);
+    hermes_backend::BookKeep::afterCopy(bookkeeping, wasEmpty, this, &assign);
   }
   return *this;
 }
@@ -195,8 +192,9 @@ template <typename T>
 Weak<T>& Weak<T>::operator=(script::Weak<T>&& move) noexcept {
   if (this != &move) {
     bool wasEmpty = isEmpty();
+    auto bookkeeping = hermes_backend::BookKeep::beforeAssign(this, &move);
     val_ = std::move(move.val_);
-    hermes_backend::BookKeep::afterMove(wasEmpty, this, &move);
+    hermes_backend::BookKeep::afterMove(bookkeeping, wasEmpty, this, &move);
   }
   return *this;
 }

@@ -57,7 +57,6 @@ class GlobalWeakBookkeeping {
 
  private:
   ListType bookkeeping_{};
-  bool isClearing_ = false;
 
   // for unit-test only
   friend struct TestAccessor;
@@ -100,9 +99,7 @@ class GlobalWeakBookkeeping {
   void remove(const T* ref, HandleType& handle) noexcept {
     SCRIPTX_UNUSED(ref);
     assert(!isHandleEmpty(handle));
-    if (!isClearing_) {
-      bookkeeping_.erase(handle);
-    }
+    bookkeeping_.erase(handle);
     handle = {};
   }
 
@@ -154,13 +151,16 @@ class GlobalWeakBookkeeping {
     }
   }
 
+  // A reset can free objects whose destructors release references later in the list, which then
+  // remove their own entries: so the front is taken afresh each time, never through an iterator.
   void clear() noexcept {
-    isClearing_ = true;
-    for (auto&& b : bookkeeping_) {
-      b.perform();
+    while (!bookkeeping_.empty()) {
+      auto front = bookkeeping_.front();
+      front.perform();
+      if (!bookkeeping_.empty() && bookkeeping_.front() == front) {
+        bookkeeping_.pop_front();
+      }
     }
-    bookkeeping_.clear();
-    isClearing_ = false;
   }
 
   /**
@@ -192,26 +192,41 @@ class GlobalWeakBookkeeping {
       bk->remove(ref, Fetcher::handle(ref));
     }
 
+    // Read before an assignment, for afterCopy and afterMove: assigning an empty reference clears
+    // the destination's engine, the only way to its bookkeeping and so to its entry.
     template <typename T>
-    static void afterCopy(bool wasEmpty, const T* thiz, const T* ref) {
+    static GlobalWeakBookkeeping* beforeAssign(const T* thiz, const T* ref) {
       auto bk = Fetcher::get(thiz);
-      if (!bk) {
-        bk = Fetcher::get(ref);
-      }
+      return bk ? bk : Fetcher::get(ref);
+    }
+
+    // A non-empty reference is never assigned one of another engine.
+    template <typename T>
+    static void afterCopy(GlobalWeakBookkeeping* bk, bool wasEmpty, const T* thiz, const T* ref) {
+      assert(bk == nullptr || Fetcher::get(thiz) == nullptr || Fetcher::get(thiz) == bk);
       if (bk) {
         bk->afterCopy(wasEmpty, thiz, Fetcher::handle(thiz), ref);
       }
     }
 
     template <typename T>
-    static void afterMove(bool wasEmpty, const T* thiz, const T* ref) {
-      auto bk = Fetcher::get(thiz);
-      if (!bk) {
-        bk = Fetcher::get(ref);
-      }
+    static void afterMove(GlobalWeakBookkeeping* bk, bool wasEmpty, const T* thiz, const T* ref) {
+      assert(bk == nullptr || Fetcher::get(thiz) == nullptr || Fetcher::get(thiz) == bk);
       if (bk) {
         bk->afterMove(wasEmpty, thiz, Fetcher::handle(thiz), ref, Fetcher::handle(ref));
       }
+    }
+
+    // These read the bookkeeping after the assignment, so they leave the entry of a reference
+    // assigned an empty one in place, where it dangles: use beforeAssign and the overloads above.
+    template <typename T>
+    static void afterCopy(bool wasEmpty, const T* thiz, const T* ref) {
+      afterCopy(beforeAssign(thiz, ref), wasEmpty, thiz, ref);
+    }
+
+    template <typename T>
+    static void afterMove(bool wasEmpty, const T* thiz, const T* ref) {
+      afterMove(beforeAssign(thiz, ref), wasEmpty, thiz, ref);
     }
 
     template <typename T>
@@ -233,6 +248,17 @@ class GlobalWeakBookkeeping {
 
     template <typename T>
     static void remove(const T*) {}
+
+    template <typename T>
+    static GlobalWeakBookkeeping* beforeAssign(const T*, const T*) {
+      return nullptr;
+    }
+
+    template <typename T>
+    static void afterCopy(GlobalWeakBookkeeping*, bool, const T*, const T*) {}
+
+    template <typename T>
+    static void afterMove(GlobalWeakBookkeeping*, bool, const T*, const T*) {}
 
     template <typename T>
     static void afterCopy(bool, const T*, const T*) {}
