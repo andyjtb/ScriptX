@@ -24,7 +24,51 @@
 #include "QjsEngine.h"
 #include "QjsHelper.hpp"
 
+#if SCRIPTX_BACKEND_QUICKJS_NG
+#include <algorithm>
+#include <cstdlib>
+#include <cstring>
+#endif
+
 namespace script {
+
+#if SCRIPTX_BACKEND_QUICKJS_NG
+namespace {
+
+struct ExternalByteBuffer {
+  // Null once a resize has moved the bytes into a block of our own.
+  std::shared_ptr<void> owner;
+  size_t size;
+};
+
+// QuickJS asks for a size of zero to free the data and for any other to resize it, keeping the
+// bytes up to the smaller size; for a null return it throws an out-of-memory InternalError.
+void* reallocExternalByteBuffer(JSRuntime*, void* opaque, void* ptr, size_t newSize) {
+  auto* buffer = static_cast<ExternalByteBuffer*>(opaque);
+
+  if (newSize == 0) {
+    if (buffer->owner == nullptr) std::free(ptr);
+    delete buffer;
+    return nullptr;
+  }
+
+  if (buffer->owner == nullptr) {
+    auto* resized = std::realloc(ptr, newSize);
+    if (resized != nullptr) buffer->size = newSize;
+    return resized;
+  }
+
+  auto* moved = std::malloc(newSize);
+  if (moved == nullptr) return nullptr;
+
+  std::memcpy(moved, ptr, std::min(buffer->size, newSize));
+  buffer->owner.reset();
+  buffer->size = newSize;
+  return moved;
+}
+
+}  // namespace
+#endif
 
 Local<Object> Object::newObject() {
   auto obj = JS_NewObject(qjs_backend::currentContext());
@@ -172,6 +216,22 @@ Local<script::ByteBuffer> ByteBuffer::newByteBuffer(void* nativeBuffer, size_t s
 
 Local<ByteBuffer> ByteBuffer::newByteBuffer(std::shared_ptr<void> nativeBuffer, size_t size) {
   auto ptr = nativeBuffer.get();
+
+#if SCRIPTX_BACKEND_QUICKJS_NG
+  // Over null QuickJS allocates the buffer itself and frees it with its own allocator, never
+  // reallocExternalByteBuffer, so an owner handed over would never be released.
+  if (ptr == nullptr) return newByteBuffer(nullptr, size);
+
+  auto external =
+      std::make_unique<ExternalByteBuffer>(ExternalByteBuffer{std::move(nativeBuffer), size});
+
+  auto ab = JS_NewArrayBuffer(qjs_backend::currentContext(), static_cast<uint8_t*>(ptr), size, 0,
+                              reallocExternalByteBuffer, external.get(), false);
+  qjs_backend::checkException(ab);
+
+  external.release();  // NOLINT(bugprone-unused-return-value)
+  return qjs_interop::makeLocal<ByteBuffer>(ab);
+#else
   auto sharedPtrPtr = std::make_unique<std::shared_ptr<void>>(std::move(nativeBuffer));
   auto opaque = sharedPtrPtr.get();
 
@@ -185,6 +245,7 @@ Local<ByteBuffer> ByteBuffer::newByteBuffer(std::shared_ptr<void> nativeBuffer, 
 
   sharedPtrPtr.release();  // NOLINT(bugprone-unused-return-value)
   return qjs_interop::makeLocal<ByteBuffer>(ab);
+#endif
 }
 
 }  // namespace script

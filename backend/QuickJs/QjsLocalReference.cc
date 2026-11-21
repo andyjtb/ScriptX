@@ -217,7 +217,9 @@ bool Local<Value>::operator==(const script::Local<script::Value>& other) const {
 
   auto& engine = qjs_backend::currentEngine();
   auto context = engine.context_;
-#ifdef QUICK_JS_HAS_SCRIPTX_PATCH
+#if SCRIPTX_BACKEND_QUICKJS_NG
+  return JS_IsStrictEqual(context, val_, qjs_interop::peekLocal(other));
+#elif defined(QUICK_JS_HAS_SCRIPTX_PATCH)
   return JS_StrictEqual(context, val_, qjs_interop::peekLocal(other));
 #else
   auto fun = qjs_interop::makeLocal<Function>(
